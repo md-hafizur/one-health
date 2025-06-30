@@ -57,4 +57,11 @@ celerybeat.pid
 # Docker
 *.pid
 *.sock
+# Ignore all Dockerfiles
 Dockerfile
+
+# But allow backend/Dockerfile specifically
+Dockerfile
+!backend/Dockerfile
+
+
