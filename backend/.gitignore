@@ -57,3 +57,8 @@ celerybeat.pid
 # Docker
 *.pid
 *.sock
+
+# Docker files (optional)
+docker-compose.yml
+docker-compose.override.yml
+Dockerfile
