@@ -57,3 +57,4 @@ celerybeat.pid
 # Docker
 *.pid
 *.sock
+Dockerfile
