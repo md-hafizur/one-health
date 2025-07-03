@@ -1,17 +1,19 @@
 from django.contrib.auth.models import AbstractUser
+from core.utils import BaseModel
 from django.db import models
+from django.db.models import Q
 from apps.address.models import Union
 from core.validators import phone_validator
 
 class Role(models.Model):
-    name = models.CharField(max_length=50, unique=True)  # e.g. admin, collector, public
-    label = models.CharField(max_length=100)  # Human-readable label
+    name = models.CharField(max_length=50, unique=True)
+    label = models.CharField(max_length=100) 
 
     def __str__(self):
         return self.label
 
 
-class User(AbstractUser):
+class User(AbstractUser, BaseModel):
     phone = models.CharField(
         max_length=11,
         validators=[phone_validator],
@@ -20,7 +22,7 @@ class User(AbstractUser):
         blank=True,
     )
 
-    role = models.ForeignKey("Role", on_delete=models.PROTECT, null=True, blank=True)
+    role = models.ForeignKey(Role, on_delete=models.PROTECT, null=True, blank=True)
 
     parent = models.ForeignKey(
         'self',
@@ -29,29 +31,99 @@ class User(AbstractUser):
         on_delete=models.CASCADE,
         related_name='sub_users'
     )
+    username = models.CharField(
+        max_length=150,
+        unique=True,
+        null=True,
+        blank=True,
+    )
 
+    addBy = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='added_by'
+    )
 
-    def save(self, *args, **kwargs):
-        if not self.parent and User.objects.filter(phone=self.phone, parent__isnull=True).exclude(pk=self.pk).exists():
-            raise ValueError("Phone number must be unique for main users (non-sub users).")
+    rejectedBy = models.ForeignKey(
+        "self",
+        related_name="rejected_by",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
 
-        if not self.is_superuser and not self.role:
-            raise ValueError("Regular users must have a role.")
+    email_verified = models.BooleanField(default=False)
+    phone_verified = models.BooleanField(default=False)
+    
 
-        super().save(*args, **kwargs)
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['email'],
+                condition=Q(parent__isnull=True) & ~Q(email__isnull=True) & ~Q(email=''),
+                name='unique_main_email'
+            ),
+            models.UniqueConstraint(
+                fields=['phone'],
+                condition=Q(parent__isnull=True) & ~Q(phone__isnull=True) & ~Q(phone=''),
+                name='unique_main_phone'
+            ),
+        ]
+
+    def __str__(self):
+        return self.username or self.email or self.phone or f"User-{self.pk}"
+
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    # Common fields here
-    name = models.CharField(max_length=100)
+
+    # Core profile
+    name_en = models.CharField(max_length=100)
+    name_bn = models.CharField(max_length=100)
+
     phone = models.CharField(max_length=11, validators=[phone_validator])
-    # Fields mostly for public user
-    father_name = models.CharField(blank=True, null=True)
-    mother_name = models.CharField(blank=True, null=True)
-    spouse_name = models.CharField(blank=True, null=True)
-    photo = models.ImageField(blank=True, null=True)
-    signature = models.ImageField(blank=True, null=True)
+    gurdian_phone = models.CharField(max_length=11, validators=[phone_validator], blank=True, null=True)
+
+    nid = models.CharField(max_length=17, blank=True, null=True)
+    gurdian_nid = models.CharField(max_length=17, blank=True, null=True)
+
+    # Parents/Spouse Info
+    father_name_en = models.CharField(max_length=100, blank=True, null=True)
+    father_name_bn = models.CharField(max_length=100, blank=True, null=True)
+
+    mother_name_en = models.CharField(max_length=100, blank=True, null=True)
+    mother_name_bn = models.CharField(max_length=100, blank=True, null=True)
+
+    spouse_name_en = models.CharField(max_length=100, blank=True, null=True)
+    spouse_name_bn = models.CharField(max_length=100, blank=True, null=True)
+
+    occupation = models.CharField(max_length=100, blank=True, null=True)
+
+    blood_group = models.CharField(max_length=3, blank=True, null=True)
+    data_of_birth = models.DateField(blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+
+    # Address
     address = models.ForeignKey(Union, on_delete=models.SET_NULL, null=True, blank=True, related_name='profiles')
+
+    photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    signature = models.ImageField(upload_to='signatures/', blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.name_en} / {self.name_bn}"
+
+    
+
+
+    @property
+    def para(self):
+        return self.address
+
+    @property
+    def village(self):
+        return self.para.village if self.para else None
 
     @property
     def upazila(self):

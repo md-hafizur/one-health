@@ -38,3 +38,19 @@ class Union(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Village(models.Model):
+    name = models.CharField(max_length=100)
+    union = models.ForeignKey("Union", on_delete=models.CASCADE, related_name="villages")
+
+    def __str__(self):
+        return self.name
+
+
+class Para(models.Model):
+    name = models.CharField(max_length=100)
+    village = models.ForeignKey("Village", on_delete=models.CASCADE, related_name="paras")
+
+    def __str__(self):
+        return self.name
