@@ -16,14 +16,46 @@ export default function CollectorSuccessPage() {
     null,
   )
 
+  interface BaseApplication {
+    id: string
+    name: string
+    email: string
+    phone: string
+    submittedAt: string
+    paidAt: string
+    amount: string
+    reviewedAt: string | null
+  }
+
+  interface PendingApplication extends BaseApplication {
+    status: "pending"
+  }
+
+  interface ApprovedApplication extends BaseApplication {
+    status: "approved"
+    credentials: {
+      username: string
+      password: string
+      collectorId: string
+    }
+  }
+
+  interface RejectedApplication extends BaseApplication {
+    status: "rejected"
+    rejectionReason: string
+    refundStatus: string
+  }
+
+  type ApplicationData = PendingApplication | ApprovedApplication | RejectedApplication
+
   // Mock application data
-  const mockApplications = {
+  const mockApplications: Record<string, ApplicationData> = {
     "APP-001234": {
       id: "APP-001234",
       name: "John Collector",
       email: "john.collector@example.com",
       phone: "+880 1234-567890",
-      status: "pending" as const,
+      status: "pending",
       submittedAt: "2024-01-25",
       paidAt: "2024-01-25",
       amount: "৳1000",
@@ -34,7 +66,7 @@ export default function CollectorSuccessPage() {
       name: "Sarah Data Collector",
       email: "sarah.dc@example.com",
       phone: "+880 1234-567891",
-      status: "approved" as const,
+      status: "approved",
       submittedAt: "2024-01-20",
       paidAt: "2024-01-20",
       amount: "৳1000",
@@ -50,7 +82,7 @@ export default function CollectorSuccessPage() {
       name: "Ahmed Rejected",
       email: "ahmed.rejected@example.com",
       phone: "+880 1234-567892",
-      status: "rejected" as const,
+      status: "rejected",
       submittedAt: "2024-01-18",
       paidAt: "2024-01-18",
       amount: "৳1000",
@@ -242,21 +274,21 @@ export default function CollectorSuccessPage() {
                       Your data collector application has been approved. You can now login and start registering users.
                     </p>
 
-                    {currentApp.credentials && (
+                    {(currentApp as ApprovedApplication).credentials && (
                       <div className="bg-white rounded-lg p-4 border border-green-200">
                         <h5 className="font-semibold text-gray-800 mb-3">Your Login Credentials:</h5>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-600">Username:</span>
-                            <span className="font-mono font-medium">{currentApp.credentials.username}</span>
+                            <span className="font-mono font-medium">{(currentApp as ApprovedApplication).credentials.username}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">Password:</span>
-                            <span className="font-mono font-medium">{currentApp.credentials.password}</span>
+                            <span className="font-mono font-medium">{(currentApp as ApprovedApplication).credentials.password}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">Collector ID:</span>
-                            <span className="font-mono font-medium">{currentApp.credentials.collectorId}</span>
+                            <span className="font-mono font-medium">{(currentApp as ApprovedApplication).credentials.collectorId}</span>
                           </div>
                         </div>
                       </div>
@@ -308,13 +340,13 @@ export default function CollectorSuccessPage() {
 
                   <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
                     <h4 className="font-semibold text-red-800 mb-2">Rejection Reason</h4>
-                    <p className="text-red-700">{currentApp.rejectionReason}</p>
+                    <p className="text-red-700">{(currentApp as RejectedApplication).rejectionReason}</p>
                   </div>
 
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                     <h4 className="font-semibold text-green-800 mb-2">💰 Refund Processed</h4>
                     <p className="text-green-700 text-sm">
-                      Your registration fee of {currentApp.amount} has been refunded to your original payment method.
+                      Your registration fee of {(currentApp as RejectedApplication).amount} has been refunded to your original payment method.
                     </p>
                   </div>
 
