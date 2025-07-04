@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -10,10 +12,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Shield, Users, UserCheck, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const [activeRole, setActiveRole] = useState("public")
   const router = useRouter()
+  const [isSignUp, setIsSignUp] = useState(false)
+
+  // Controlled state for login forms
+  const [loginData, setLoginData] = useState({
+    username: "",
+    password: "",
+  })
+
+  // Controlled state for signup form
+  const [signUpData, setSignUpData] = useState({
+    firstName: "",
+    lastName: "",
+    contactInfo: "", // Combined phone and email
+    password: "",
+    confirmPassword: "",
+  })
 
   const handleLogin = (role: string) => {
     // Simulate login and redirect based on role
@@ -28,6 +47,54 @@ export default function LoginPage() {
         router.push("/user/dashboard")
         break
     }
+  }
+
+  const handleSignUp = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Validation
+    if (signUpData.password !== signUpData.confirmPassword) {
+      toast.error("Passwords do not match")
+      return
+    }
+
+    if (signUpData.password.length < 6) {
+      toast.error("Password must be at least 6 characters")
+      return
+    }
+
+    if (!signUpData.contactInfo) {
+      toast.error("Phone number or email address is required.")
+      return
+    }
+
+    // Simulate signup process
+    toast.success("Registration submitted! Please complete payment to activate your account.")
+    // Redirect to payment page instead of just showing success
+    router.push(`/signup/collector/payment?application=${Date.now().toString().slice(-6)}`)
+  }
+
+  const resetLoginData = () => {
+    setLoginData({
+      username: "",
+      password: "",
+    })
+  }
+
+  const resetSignUpData = () => {
+    setSignUpData({
+      firstName: "",
+      lastName: "",
+      contactInfo: "",
+      password: "",
+      confirmPassword: "",
+    })
+  }
+
+  const toggleSignUp = () => {
+    setIsSignUp(!isSignUp)
+    resetLoginData()
+    resetSignUpData()
   }
 
   const roles = [
@@ -86,51 +153,219 @@ export default function LoginPage() {
                 ))}
               </TabsList>
 
-              {roles.map((role) => (
-                <TabsContent key={role.id} value={role.id}>
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <div className="text-center mb-6">
-                      <div
-                        className={`w-16 h-16 ${role.color} rounded-full flex items-center justify-center mx-auto mb-3`}
+              {roles.map((role) => {
+                if (role.id === "collector") {
+                  return (
+                    <TabsContent key="collector" value="collector">
+                      <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3 }}
                       >
-                        <role.icon className="h-8 w-8 text-white" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-800">{role.title}</h3>
-                      <p className="text-sm text-gray-600">{role.description}</p>
-                    </div>
+                        <div className="text-center mb-6">
+                          <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <UserCheck className="h-8 w-8 text-white" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-800">Data Collector</h3>
+                          <p className="text-sm text-gray-600">Register users and manage data</p>
+                        </div>
 
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault()
-                        handleLogin(role.id)
-                      }}
-                      className="space-y-4"
+                        {!isSignUp ? (
+                          // Login Form
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault()
+                              handleLogin("collector")
+                            }}
+                            className="space-y-4"
+                          >
+                            <div>
+                              <Label htmlFor="username-collector">Username</Label>
+                              <Input
+                                id="username-collector"
+                                type="text"
+                                placeholder="Enter your username"
+                                value={loginData.username}
+                                onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="password-collector">Password</Label>
+                              <Input
+                                id="password-collector"
+                                type="password"
+                                placeholder="Enter your password"
+                                value={loginData.password}
+                                onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                                required
+                              />
+                            </div>
+                            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
+                              Login as Data Collector
+                            </Button>
+
+                            <div className="text-center mt-4">
+                              <button
+                                type="button"
+                                onClick={toggleSignUp}
+                                className="text-sm text-blue-600 hover:text-blue-700 underline"
+                              >
+                                Don't have an account? Sign up here
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          // Sign Up Form
+                          <form onSubmit={handleSignUp} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label htmlFor="firstName">First Name *</Label>
+                                <Input
+                                  id="firstName"
+                                  type="text"
+                                  value={signUpData.firstName}
+                                  onChange={(e) => setSignUpData({ ...signUpData, firstName: e.target.value })}
+                                  placeholder="Enter first name"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="lastName">Last Name *</Label>
+                                <Input
+                                  id="lastName"
+                                  type="text"
+                                  value={signUpData.lastName}
+                                  onChange={(e) => setSignUpData({ ...signUpData, lastName: e.target.value })}
+                                  placeholder="Enter last name"
+                                  required
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <Label htmlFor="contactInfo">Phone Number or Email Address *</Label>
+                              <Input
+                                id="contactInfo"
+                                type="text"
+                                value={signUpData.contactInfo}
+                                onChange={(e) => setSignUpData({ ...signUpData, contactInfo: e.target.value })}
+                                placeholder="Enter phone number or email address"
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="password">Password *</Label>
+                              <Input
+                                id="password"
+                                type="password"
+                                value={signUpData.password}
+                                onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                                placeholder="Enter password (min 6 characters)"
+                                required
+                                minLength={6}
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                              <Input
+                                id="confirmPassword"
+                                type="password"
+                                value={signUpData.confirmPassword}
+                                onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+                                placeholder="Confirm your password"
+                                required
+                                minLength={6}
+                              />
+                            </div>
+
+                            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
+                              Sign Up as Data Collector
+                            </Button>
+
+                            <div className="text-center mt-4">
+                              <button
+                                type="button"
+                                onClick={toggleSignUp}
+                                className="text-sm text-blue-600 hover:text-blue-700 underline"
+                              >
+                                Already have an account? Login here
+                              </button>
+                            </div>
+                          </form>
+                        )}
+
+                        <div className="text-center mt-4">
+                          <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700">
+                            Forgot Password?
+                          </Link>
+                        </div>
+                      </motion.div>
+                    </TabsContent>
+                  )
+                }
+                return (
+                  <TabsContent key={role.id} value={role.id}>
+                    <motion.div
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3 }}
                     >
-                      <div>
-                        <Label htmlFor={`username-${role.id}`}>Username</Label>
-                        <Input id={`username-${role.id}`} type="text" placeholder="Enter your username" required />
+                      <div className="text-center mb-6">
+                        <div
+                          className={`w-16 h-16 ${role.color} rounded-full flex items-center justify-center mx-auto mb-3`}
+                        >
+                          <role.icon className="h-8 w-8 text-white" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800">{role.title}</h3>
+                        <p className="text-sm text-gray-600">{role.description}</p>
                       </div>
-                      <div>
-                        <Label htmlFor={`password-${role.id}`}>Password</Label>
-                        <Input id={`password-${role.id}`} type="password" placeholder="Enter your password" required />
-                      </div>
-                      <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                        Login as {role.title}
-                      </Button>
-                    </form>
 
-                    <div className="text-center mt-4">
-                      <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700">
-                        Forgot Password?
-                      </Link>
-                    </div>
-                  </motion.div>
-                </TabsContent>
-              ))}
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleLogin(role.id)
+                        }}
+                        className="space-y-4"
+                      >
+                        <div>
+                          <Label htmlFor={`username-${role.id}`}>Username</Label>
+                          <Input
+                            id={`username-${role.id}`}
+                            type="text"
+                            placeholder="Enter your username"
+                            value={loginData.username}
+                            onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`password-${role.id}`}>Password</Label>
+                          <Input
+                            id={`password-${role.id}`}
+                            type="password"
+                            placeholder="Enter your password"
+                            value={loginData.password}
+                            onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
+                          Login as {role.title}
+                        </Button>
+                      </form>
+
+                      <div className="text-center mt-4">
+                        <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700">
+                          Forgot Password?
+                        </Link>
+                      </div>
+                    </motion.div>
+                  </TabsContent>
+                )
+              })}
             </Tabs>
           </CardContent>
         </Card>
