@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'apps.accounts',
     'apps.address',
+    'apps.payment',
 ]
 
 MIDDLEWARE = [
@@ -110,6 +111,17 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+
+
+# send email via smtp
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'mdhafizur.cse@gmail.com'  # Use a dedicated Gmail
+EMAIL_HOST_PASSWORD = 'app-password'  # Generate in Google Account Security
+DEFAULT_FROM_EMAIL = 'noreply@yourdomain.com'
 
 
 # Internationalization

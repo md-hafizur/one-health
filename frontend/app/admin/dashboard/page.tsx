@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Shield, Users, CreditCard, Search, LogOut, Download, Eye, MoreHorizontal, TreePine } from "lucide-react"
 import Link from "next/link"
 import { FamilyRelationshipView } from "@/components/family-relationship-view"
+import { PendingCollectorsTable } from "@/components/pending-collectors-table"
 
 export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -103,7 +104,7 @@ export default function AdminDashboard() {
   ]
 
   const collectorData =
-  [
+    [
       {
         id: "DC-001",
         name: "Sarah Collector",
@@ -224,7 +225,7 @@ export default function AdminDashboard() {
           },
         ],
       },
-    ] 
+    ]
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -301,9 +302,10 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="users" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="users">All Users</TabsTrigger>
                   <TabsTrigger value="collectors">Collectors</TabsTrigger>
+                  <TabsTrigger value="pending">Pending Applications</TabsTrigger>
                   <TabsTrigger value="payments">Payment Logs</TabsTrigger>
                 </TabsList>
 
@@ -505,6 +507,10 @@ export default function AdminDashboard() {
                       </TableBody>
                     </Table>
                   </div>
+                </TabsContent>
+
+                <TabsContent value="pending" className="space-y-4">
+                  <PendingCollectorsTable />
                 </TabsContent>
 
                 <TabsContent value="payments" className="space-y-4">
