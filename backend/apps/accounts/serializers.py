@@ -2,6 +2,7 @@
 from rest_framework import serializers
 from .models import User, Role
 from core.constants import UserRole
+from datetime import datetime
 
 class RoleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -86,3 +87,72 @@ class UserSerializer(serializers.ModelSerializer):
 #             raise serializers.ValidationError(errors)
 
 #         return data
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    role_id = serializers.IntegerField()
+    email = serializers.EmailField(required=False, allow_null=True)
+    phone = serializers.CharField(required=False, allow_null=True)
+    otp = serializers.CharField(max_length=6)
+
+    def validate(self, data):
+        user_id = data.get("user_id")
+        otp = data.get("otp")
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found.")
+
+        contact_fields = {
+            'email': {
+                'code_field': 'email_code',
+                'verify_field': 'email_verified',
+                'error': 'Invalid OTP for email.'
+            },
+            'phone': {
+                'code_field': 'phone_code',
+                'verify_field': 'phone_verified',
+                'error': 'Invalid OTP for phone.'
+            }
+        }
+
+        for field, config in contact_fields.items():
+            value = data.get(field)
+            if value and getattr(user, field) == value:
+                if getattr(user, config['code_field']) != otp:
+                    raise serializers.ValidationError({field: config['error']})
+
+                # Update verification status
+                setattr(user, config['verify_field'], True)
+                setattr(user, config['code_field'], None)
+                user.save()
+
+                # Get fee breakdown from role
+                fee = None
+                if user.role:
+                    try:
+                        fee = user.role.payment_fee
+                    except PaymentFee.DoesNotExist:
+                        pass
+
+                fee_data = {
+                    "registration_fee": f"৳{fee.amount}" if fee else "N/A",
+                    "verification_fee": f"৳{fee.verification_fee}" if fee else "N/A",
+                    "processing_fee": f"৳{fee.processing_fee}" if fee else "N/A",
+                    "total_amount": f"৳{fee.total_amount}" if fee else "N/A"
+                }
+
+                return {
+                    "application_id": f"APP-{user.id:06}",
+                    "applicant_name": user.get_full_name() or user.username,
+                    "verified_contact": "Phone Number" if field == "phone" else "Email",
+                    "verification_method": "Phone Number" if field == "phone" else "Email",
+                    "verification_status": "Verified",
+                    "submitted": datetime.now().strftime("%Y-%m-%d"),
+                    "fees": fee_data
+                }
+
+        raise serializers.ValidationError("No valid contact field matched or provided.")
+

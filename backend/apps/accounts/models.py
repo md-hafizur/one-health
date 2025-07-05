@@ -1,5 +1,5 @@
 from django.contrib.auth.models import AbstractUser
-from core.utils import BaseModel
+from core.utils.modeler import BaseModel
 from django.db import models
 from django.db.models import Q
 from apps.address.models import Union
@@ -56,6 +56,11 @@ class User(AbstractUser, BaseModel):
 
     email_verified = models.BooleanField(default=False)
     phone_verified = models.BooleanField(default=False)
+
+    email_code = models.CharField(max_length=6, null=True, blank=True)
+    phone_code = models.CharField(max_length=6, null=True, blank=True)
+
+    payment_status = models.CharField(max_length=10, choices=[('Paid', 'Paid'), ('Pending', 'Pending'), ('Failed', 'Failed')], default='Pending')
     
 
     class Meta:

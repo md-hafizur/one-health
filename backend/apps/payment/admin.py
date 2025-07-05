@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Payment, PaymentLog
+from .models import Payment, PaymentLog, PaymentFee
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
@@ -14,3 +14,9 @@ class PaymentLogAdmin(admin.ModelAdmin):
     list_filter = ('created_at',)
     search_fields = ('payment__transaction_id', 'message')
     raw_id_fields = ('payment',)
+
+@admin.register(PaymentFee)
+class PaymentFeeAdmin(admin.ModelAdmin):
+    list_display = ('fee_name', 'role', 'amount', 'currency', 'is_active', 'created_at', 'updated_at')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('role__name', 'fee_name')
