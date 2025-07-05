@@ -1,5 +1,5 @@
 from django.db import models
-from apps.accounts.models import User
+from apps.accounts.models import User, Role
 
 class Payment(models.Model):
     PAYMENT_METHODS = (
@@ -33,3 +33,23 @@ class PaymentLog(models.Model):
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='logs')
     message = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+
+class PaymentFee(models.Model):
+    role = models.OneToOneField(Role, on_delete=models.CASCADE, related_name='payment_fee')
+    fee_name = models.CharField(max_length=100, default="Standard Fee")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=10, default='BDT')
+    is_active = models.BooleanField(default=True)
+    verification_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    processing_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def total_amount(self):
+        return self.amount + self.verification_fee + self.processing_fee
+
+    def __str__(self):
+        return f"{self.role.name} - {self.amount} {self.currency}"
