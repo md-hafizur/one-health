@@ -141,30 +141,27 @@ export function RegisterUserModal({ open, onOpenChange }: RegisterUserModalProps
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="email">Email (Optional)</Label>
+            <div>
+              <Label htmlFor="contact">Phone Number or Email Address</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Enter email address"
+                  id="contact"
+                  value={formData.phone || formData.email}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    // Auto-detect if it's email or phone
+                    if (value.includes("@")) {
+                      setFormData({ ...formData, email: value, phone: "" })
+                    } else {
+                      setFormData({ ...formData, phone: value, email: "" })
+                    }
+                  }}
+                  placeholder="Enter phone number or email address"
+                  className="pl-10"
                 />
               </div>
-              <div>
-                <Label htmlFor="phone">Phone Number (Optional)</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+880 1234-567890"
-                    className="pl-10"
-                  />
-                </div>
-              </div>
+              <p className="text-sm text-gray-500 mt-1">Optional: For verification and login credentials</p>
             </div>
 
             <div>

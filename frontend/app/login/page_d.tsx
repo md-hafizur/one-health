@@ -29,8 +29,7 @@ export default function LoginPage() {
   const [signUpData, setSignUpData] = useState({
     firstName: "",
     lastName: "",
-    phone: "",
-    email: "",
+    contactInfo: "",
     password: "",
     confirmPassword: "",
   })
@@ -50,39 +49,71 @@ export default function LoginPage() {
     }
   }
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validation
+    // 1. Form Validation
     if (signUpData.password !== signUpData.confirmPassword) {
       toast.error("Passwords do not match")
       return
     }
-
     if (signUpData.password.length < 6) {
-      toast.error("Password must be at least 6 characters")
+      toast.error("Password must be at least 6 characters long")
+      return
+    }
+    if (!signUpData.contactInfo) {
+      toast.error("Please provide a phone number or email address")
       return
     }
 
-    // Check if either phone or email is provided (not both required)
-    if (!signUpData.phone && !signUpData.email) {
-      toast.error("Please provide either phone number or email address")
-      return
+    // 2. Prepare API Payload
+    const isEmail = signUpData.contactInfo.includes("@")
+    const payload = {
+      first_name: signUpData.firstName,
+      last_name: signUpData.lastName,
+      password: signUpData.password,
+      confirm_password: signUpData.confirmPassword,
+      [isEmail ? "email" : "phone"]: signUpData.contactInfo,
     }
 
-    // Store signup data and redirect to verification
-    const signupData = {
-      ...signUpData,
-      applicationId: `APP-${Date.now().toString().slice(-6)}`,
-      verificationType: signUpData.phone ? "phone" : "email", // Determine verification type
+    // 3. API Call
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const response = await fetch(`${apiUrl}/accounts/register?identity=DataCollector&for_account=self`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        // Handle API errors (e.g., validation errors)
+        if (result.errors) {
+          Object.entries(result.errors).forEach(([field, errors]) => {
+            const errorMessages = (errors as string[]).join(" ");
+            toast.error(`${field}: ${errorMessages}`);
+          });
+        } else {
+          toast.error("An unknown error occurred.");
+        }
+        return
+      }
+
+      // 4. Handle Success
+      toast.success(result.message || "Registration successful! Redirecting to verify...")
+
+      // Redirect to a verification page, passing user identifier
+      const userId = result.data.id
+      router.push(`/signup/collector/verify?user_id=${userId}`)
+
+    } catch (error) {
+      // Handle network or other unexpected errors
+      console.error("Signup Error:", error)
+      toast.error("An unexpected error occurred. Please try again later.")
     }
-
-    // In a real app, you'd store this in a secure way
-    localStorage.setItem("pendingCollectorSignup", JSON.stringify(signupData))
-
-    toast.success("Registration data saved! Please verify your contact information.")
-    // Redirect to verification page
-    router.push(`/signup/collector/verify?application=${signupData.applicationId}`)
   }
 
   const resetLoginData = () => {
@@ -96,8 +127,7 @@ export default function LoginPage() {
     setSignUpData({
       firstName: "",
       lastName: "",
-      phone: "",
-      email: "",
+      contactInfo: "",
       password: "",
       confirmPassword: "",
     })
@@ -256,32 +286,18 @@ export default function LoginPage() {
                             </div>
 
                             <div>
-                              <Label htmlFor="phone">Phone Number</Label>
+                              <Label htmlFor="contactInfo">Phone Number or Email Address *</Label>
                               <Input
-                                id="phone"
-                                type="tel"
-                                value={signUpData.phone}
-                                onChange={(e) => setSignUpData({ ...signUpData, phone: e.target.value })}
-                                placeholder="+880 1234-567890"
+                                id="contactInfo"
+                                type="text"
+                                value={signUpData.contactInfo}
+                                onChange={(e) => setSignUpData({ ...signUpData, contactInfo: e.target.value })}
+                                placeholder="Enter phone number or email address"
+                                required
                               />
                             </div>
 
-                            <div>
-                              <Label htmlFor="email">Email Address</Label>
-                              <Input
-                                id="email"
-                                type="email"
-                                value={signUpData.email}
-                                onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
-                                placeholder="Enter email address"
-                              />
-                            </div>
-
-                            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                              <p>
-                                📝 <strong>Note:</strong> Provide either phone number OR email address for verification.
-                              </p>
-                            </div>
+                            
 
                             <div>
                               <Label htmlFor="password">Password *</Label>

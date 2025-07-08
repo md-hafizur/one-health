@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -10,15 +9,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, User, Phone, MapPin, Upload, FileImage, PenTool, CreditCard, CheckCircle } from "lucide-react"
+import { ArrowLeft, User, Phone, MapPin, Upload, FileImage, PenTool, CreditCard, CheckCircle, Mail } from "lucide-react"
 import Link from "next/link"
-import { PaymentModal } from "@/components/payment-modal"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 export default function RegisterPage() {
-  const [step, setStep] = useState(1) // 1: Form, 2: Success, 3: Payment Complete
-  const [showPayment, setShowPayment] = useState(false)
+  const [step, setStep] = useState(1) // 1: Form, 2: Verification, 3: Payment, 4: Success
   const [formData, setFormData] = useState({
     name: "",
     fatherName: "",
@@ -33,6 +30,8 @@ export default function RegisterPage() {
     photo: null as File | null,
     signature: null as File | null,
   })
+
+  const router = useRouter()
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -52,20 +51,32 @@ export default function RegisterPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Simulate saving to database
-    setTimeout(() => {
-      setStep(2)
-      toast.success("Registration data saved successfully!")
-    }, 1000)
+
+    // Check if contact information is provided
+    if (!formData.phone && !formData.email) {
+      toast.error("Please provide either phone number or email address")
+      return
+    }
+
+    // Store registration data and proceed to verification
+    const registrationData = {
+      ...formData,
+      registrationId: `REG-${Date.now().toString().slice(-6)}`,
+      verificationType: formData.phone ? "phone" : "email",
+    }
+
+    localStorage.setItem("pendingUserRegistration", JSON.stringify(registrationData))
+    setStep(2)
+    toast.success("Registration data saved! Please verify your contact information.")
   }
 
-  const handlePayNow = () => {
-    setShowPayment(true)
+  const handleVerificationComplete = () => {
+    setStep(3)
+    toast.success("Verification complete! Please proceed with payment.")
   }
 
   const handlePaymentSuccess = () => {
-    setShowPayment(false)
-    setStep(3)
+    setStep(4)
     toast.success("Payment successful! Digital card will be issued.")
   }
 
@@ -88,6 +99,48 @@ export default function RegisterPage() {
       </header>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Progress Indicator */}
+        <div className="max-w-4xl mx-auto mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 ${step >= 1 ? "bg-green-600" : "bg-gray-300"} rounded-full flex items-center justify-center text-white text-sm font-semibold`}
+              >
+                {step > 1 ? "✓" : "1"}
+              </div>
+              <span className={`text-sm font-medium ${step >= 1 ? "text-green-600" : "text-gray-500"}`}>
+                Registration
+              </span>
+            </div>
+            <div className={`flex-1 h-px ${step >= 2 ? "bg-green-300" : "bg-gray-300"} mx-4`}></div>
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 ${step >= 2 ? (step > 2 ? "bg-green-600" : "bg-blue-600") : "bg-gray-300"} rounded-full flex items-center justify-center text-white text-sm font-semibold`}
+              >
+                {step > 2 ? "✓" : "2"}
+              </div>
+              <span
+                className={`text-sm font-medium ${step >= 2 ? (step > 2 ? "text-green-600" : "text-blue-600") : "text-gray-500"}`}
+              >
+                Verification
+              </span>
+            </div>
+            <div className={`flex-1 h-px ${step >= 3 ? "bg-green-300" : "bg-gray-300"} mx-4`}></div>
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 ${step >= 3 ? (step > 3 ? "bg-green-600" : "bg-blue-600") : "bg-gray-300"} rounded-full flex items-center justify-center text-white text-sm font-semibold`}
+              >
+                {step > 3 ? "✓" : "3"}
+              </div>
+              <span
+                className={`text-sm font-medium ${step >= 3 ? (step > 3 ? "text-green-600" : "text-blue-600") : "text-gray-500"}`}
+              >
+                Payment
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Step 1: Registration Form */}
         {step === 1 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -148,32 +201,37 @@ export default function RegisterPage() {
                   </div>
 
                   {/* Contact Information */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <Label htmlFor="email">Email Address *</Label>
+                  <div>
+                    <Label htmlFor="contact">Phone Number or Email Address *</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="Enter email address"
+                        id="contact"
+                        value={formData.phone || formData.email}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          // Auto-detect if it's email or phone
+                          if (value.includes("@")) {
+                            setFormData({ ...formData, email: value, phone: "" })
+                          } else {
+                            setFormData({ ...formData, phone: value, email: "" })
+                          }
+                        }}
+                        placeholder="Enter phone number (+880 1234-567890) or email address"
+                        className="pl-10"
                         required
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="phone">Phone Number *</Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          placeholder="+880 1234-567890"
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      You can enter either phone number or email address for verification
+                    </p>
+                  </div>
+
+                  <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+                    <p>
+                      📝 <strong>Note:</strong> The contact information will be used for verification and sending login
+                      credentials.
+                    </p>
                   </div>
 
                   {/* Address Information */}
@@ -297,7 +355,7 @@ export default function RegisterPage() {
                   <div className="flex justify-end pt-6 border-t">
                     <Button type="submit" size="lg" className="bg-blue-600 hover:bg-blue-700">
                       <Upload className="h-5 w-5 mr-2" />
-                      Save Registration Data
+                      Continue to Verification
                     </Button>
                   </div>
                 </form>
@@ -306,186 +364,229 @@ export default function RegisterPage() {
           </motion.div>
         )}
 
-        {/* Step 2: Success & Payment */}
+        {/* Step 2: Verification */}
         {step === 2 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="max-w-2xl mx-auto"
-          >
-            <Card className="text-center">
-              <CardContent className="p-8">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle className="h-10 w-10 text-green-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">Registration Successful!</h2>
-                <p className="text-gray-600 mb-6">
-                  Your registration data has been saved successfully. Complete the payment to activate your digital
-                  health card.
-                </p>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300 mb-2">
-                    Payment Required
-                  </Badge>
-                  <p className="text-sm text-gray-700">
-                    Please complete the payment of <strong>৳500</strong> to activate your account and receive your
-                    digital health card.
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-                  <h3 className="font-semibold text-gray-800 mb-3">Registration Summary:</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Name:</span>
-                      <span className="font-medium">{formData.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Phone:</span>
-                      <span className="font-medium">{formData.phone}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Service Code:</span>
-                      <span className="font-mono font-medium">{formData.serviceCode}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Registration Fee:</span>
-                      <span className="font-bold text-green-600">৳500</span>
-                    </div>
-                  </div>
-                </div>
-
-                <Button onClick={handlePayNow} size="lg" className="bg-green-600 hover:bg-green-700">
-                  <CreditCard className="h-5 w-5 mr-2" />
-                  Pay Now - ৳500
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <UserVerificationStep onVerificationComplete={handleVerificationComplete} registrationData={formData} />
         )}
 
-        {/* Step 3: Payment Complete */}
-        {step === 3 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="max-w-2xl mx-auto"
-          >
-            <Card className="text-center">
-              <CardContent className="p-8">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle className="h-10 w-10 text-green-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">Payment Successful!</h2>
-                <p className="text-gray-600 mb-6">
-                  Your digital health card has been activated. Login credentials have been sent via SMS and email.
-                </p>
+        {/* Step 3: Payment */}
+        {step === 3 && <UserPaymentStep onPaymentSuccess={handlePaymentSuccess} registrationData={formData} />}
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-                  <h3 className="font-semibold text-gray-800 mb-4">📱 SMS Format:</h3>
-                  <div className="bg-white rounded-lg p-4 text-left border">
-                    <p className="text-sm text-gray-700">
-                      <strong>OneHealth Digital Card</strong>
-                      <br />
-                      Welcome {formData.name}!
-                      <br />
-                      Your account is now active.
-                      <br />
-                      <br />
-                      <strong>Login Details:</strong>
-                      <br />
-                      Username: user{Date.now().toString().slice(-4)}
-                      <br />
-                      Password: temp{Math.floor(Math.random() * 1000)}
-                      <br />
-                      ID: OH-2024-{Date.now().toString().slice(-3)}
-                      <br />
-                      <br />
-                      Login at: onehealth.com/login
-                    </p>
-                  </div>
+        {/* Step 4: Success */}
+        {step === 4 && <UserSuccessStep registrationData={formData} />}
+      </div>
+    </div>
+  )
+}
+
+// Verification Step Component
+function UserVerificationStep({ onVerificationComplete, registrationData }: any) {
+  const [otp, setOtp] = useState("")
+  const [verified, setVerified] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+
+  const isPhoneVerification = !!registrationData.phone
+  const contactInfo = isPhoneVerification ? registrationData.phone : registrationData.email
+  const ContactIcon = isPhoneVerification ? Phone : Mail
+  const verificationMethod = isPhoneVerification ? "Phone Number" : "Email Address"
+  const expectedOtp = isPhoneVerification ? "123456" : "654321"
+
+  const handleSendOtp = () => {
+    setOtpSent(true)
+    setResendCooldown(60)
+    toast.success(`OTP sent to ${contactInfo}`)
+
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  const handleVerifyOtp = () => {
+    if (otp === expectedOtp) {
+      setVerified(true)
+      toast.success(`${verificationMethod} verified successfully!`)
+    } else {
+      toast.error("Invalid OTP. Please try again.")
+    }
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ContactIcon className="h-6 w-6 text-blue-600" />
+            Verify {verificationMethod}
+          </CardTitle>
+          <CardDescription>
+            We need to verify your {verificationMethod.toLowerCase()} to ensure account security
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="text-center">
+              <div
+                className={`w-16 h-16 ${isPhoneVerification ? "bg-blue-100" : "bg-green-100"} rounded-full flex items-center justify-center mx-auto mb-4`}
+              >
+                <ContactIcon className={`h-8 w-8 ${isPhoneVerification ? "text-blue-600" : "text-green-600"}`} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Verify {verificationMethod}</h3>
+              <p className="text-gray-600 mb-4">
+                We'll send a 6-digit OTP to <strong>{contactInfo}</strong>
+              </p>
+            </div>
+
+            {!otpSent ? (
+              <Button onClick={handleSendOtp} className="w-full bg-blue-600 hover:bg-blue-700">
+                <ContactIcon className="h-4 w-4 mr-2" />
+                Send OTP to {verificationMethod}
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="otp">Enter OTP</Label>
+                  <Input
+                    id="otp"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder="Enter 6-digit OTP"
+                    maxLength={6}
+                    className="text-center text-lg tracking-widest font-mono"
+                    disabled={verified}
+                  />
+                  <p className="text-sm text-gray-500 mt-1 text-center">Demo OTP: {expectedOtp}</p>
                 </div>
 
-                <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
-                  <h3 className="font-semibold text-gray-800 mb-4">📧 Email Format:</h3>
-                  <div className="bg-white rounded-lg p-4 text-left border">
-                    <p className="text-sm text-gray-700">
-                      <strong>Subject:</strong> OneHealth Digital Card - Account Activated
-                      <br />
-                      <br />
-                      Dear {formData.name},
-                      <br />
-                      <br />
-                      Congratulations! Your OneHealth digital card account has been successfully activated.
-                      <br />
-                      <br />
-                      <strong>Your Login Credentials:</strong>
-                      <br />
-                      Username: user{Date.now().toString().slice(-4)}
-                      <br />
-                      Password: temp{Math.floor(Math.random() * 1000)}
-                      <br />
-                      Member ID: OH-2024-{Date.now().toString().slice(-3)}
-                      <br />
-                      Service Code: {formData.serviceCode}
-                      <br />
-                      <br />
-                      You can now access your digital health card and manage your account at onehealth.com/login
-                      <br />
-                      <br />
-                      Thank you for choosing OneHealth!
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <Link href="/collector/dashboard" className="flex-1">
-                    <Button variant="outline" className="w-full">
-                      Back to Dashboard
-                    </Button>
-                  </Link>
+                <div className="flex gap-2">
+                  <Button onClick={handleSendOtp} variant="outline" disabled={resendCooldown > 0} className="flex-1">
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend OTP"}
+                  </Button>
                   <Button
-                    onClick={() => {
-                      setStep(1)
-                      setFormData({
-                        name: "",
-                        fatherName: "",
-                        motherName: "",
-                        spouseName: "",
-                        email: "",
-                        phone: "",
-                        presentAddress: "",
-                        district: "",
-                        upazila: "",
-                        serviceCode: `SVC-${Date.now()}`,
-                        photo: null,
-                        signature: null,
-                      })
-                    }}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    onClick={handleVerifyOtp}
+                    disabled={otp.length !== 6 || verified}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
                   >
-                    Register Another User
+                    {verified ? "Verified" : "Verify OTP"}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-      </div>
+              </div>
+            )}
 
-      {/* Payment Modal */}
-      <PaymentModal
-        open={showPayment}
-        onOpenChange={setShowPayment}
-        amount={500}
-        onSuccess={handlePaymentSuccess}
-        userInfo={{
-          name: formData.name,
-          id: `OH-2024-${Date.now().toString().slice(-3)}`,
-          serviceCode: formData.serviceCode,
-        }}
-      />
-    </div>
+            <div className="pt-6 border-t">
+              <Button
+                onClick={onVerificationComplete}
+                disabled={!verified}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                size="lg"
+              >
+                Continue to Payment
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
+
+// Payment Step Component
+function UserPaymentStep({ onPaymentSuccess, registrationData }: any) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-6 w-6 text-blue-600" />
+            Payment
+          </CardTitle>
+          <CardDescription>Complete payment to activate the health card</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Amount to Pay</p>
+              <p className="text-3xl font-bold text-gray-800">৳500</p>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-800 mb-2">Registration Summary</h3>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Name:</span>
+                  <span>{registrationData.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Contact:</span>
+                  <span>{registrationData.phone || registrationData.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Service Code:</span>
+                  <span>{registrationData.serviceCode}</span>
+                </div>
+              </div>
+            </div>
+
+            <Button onClick={onPaymentSuccess} className="w-full bg-green-600 hover:bg-green-700" size="lg">
+              <CreditCard className="h-5 w-5 mr-2" />
+              Pay ৳500 Now
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
+
+// Success Step Component
+function UserSuccessStep({ registrationData }: any) {
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+      <Card className="max-w-2xl mx-auto text-center">
+        <CardContent className="p-8">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="h-10 w-10 text-green-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Registration Successful!</h2>
+          <p className="text-gray-600 mb-6">
+            The user has been registered successfully. Login credentials have been sent via{" "}
+            {registrationData.phone ? "SMS" : "email"}.
+          </p>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+            <h3 className="font-semibold text-gray-800 mb-4">Login Credentials Sent:</h3>
+            <div className="space-y-2 text-sm">
+              <p>
+                <strong>Username:</strong> user{Date.now().toString().slice(-4)}
+              </p>
+              <p>
+                <strong>Password:</strong> temp{Math.floor(Math.random() * 1000)}
+              </p>
+              <p>
+                <strong>ID:</strong> OH-2024-{Date.now().toString().slice(-3)}
+              </p>
+              <p>
+                <strong>Sent to:</strong> {registrationData.phone || registrationData.email}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-4">
+            <Link href="/collector/dashboard" className="flex-1">
+              <Button variant="outline" className="w-full bg-transparent">
+                Back to Dashboard
+              </Button>
+            </Link>
+            <Button className="flex-1 bg-blue-600 hover:bg-blue-700">Register Another User</Button>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   )
 }
