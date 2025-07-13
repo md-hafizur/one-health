@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,10 +26,18 @@ export default function RegisterPage() {
     presentAddress: "",
     district: "",
     upazila: "",
-    serviceCode: `SVC-${Date.now()}`,
+    serviceCode: "", // Initialize as empty, will be set in useEffect
     photo: null as File | null,
     signature: null as File | null,
   })
+
+  useEffect(() => {
+    // Generate serviceCode only on the client side
+    setFormData((prevData) => ({
+      ...prevData,
+      serviceCode: `SVC-${Date.now()}`,
+    }))
+  }, [])
 
   const router = useRouter()
 
@@ -61,7 +69,7 @@ export default function RegisterPage() {
     // Store registration data and proceed to verification
     const registrationData = {
       ...formData,
-      registrationId: `REG-${Date.now().toString().slice(-6)}`,
+      registrationId: `REG-${Date.now().toString().slice(-6)}`, // Generate on client side
       verificationType: formData.phone ? "phone" : "email",
     }
 
@@ -546,6 +554,16 @@ function UserPaymentStep({ onPaymentSuccess, registrationData }: any) {
 
 // Success Step Component
 function UserSuccessStep({ registrationData }: any) {
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [id, setId] = useState("")
+
+  useEffect(() => {
+    setUsername(`user${Date.now().toString().slice(-4)}`)
+    setPassword(`temp${Math.floor(Math.random() * 1000)}`)
+    setId(`OH-2024-${Date.now().toString().slice(-3)}`)
+  }, [])
+
   return (
     <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
       <Card className="max-w-2xl mx-auto text-center">
@@ -563,13 +581,13 @@ function UserSuccessStep({ registrationData }: any) {
             <h3 className="font-semibold text-gray-800 mb-4">Login Credentials Sent:</h3>
             <div className="space-y-2 text-sm">
               <p>
-                <strong>Username:</strong> user{Date.now().toString().slice(-4)}
+                <strong>Username:</strong> {username}
               </p>
               <p>
-                <strong>Password:</strong> temp{Math.floor(Math.random() * 1000)}
+                <strong>Password:</strong> {password}
               </p>
               <p>
-                <strong>ID:</strong> OH-2024-{Date.now().toString().slice(-3)}
+                <strong>ID:</strong> {id}
               </p>
               <p>
                 <strong>Sent to:</strong> {registrationData.phone || registrationData.email}

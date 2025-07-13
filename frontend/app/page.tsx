@@ -13,13 +13,9 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="text-2xl font-bold text-white"
-          >
+          <div className="text-2xl font-bold text-white">
             OneHealth
-          </motion.div>
+          </div>
           <Link href="/login">
             <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
               Login
@@ -31,10 +27,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+          <div
             className="text-center lg:text-left"
           >
             <h1 className="text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
@@ -47,32 +40,24 @@ export default function LandingPage() {
               Join thousands of families managing their health records digitally. Secure, accessible, and always with
               you.
             </p>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <div>
               <Button
                 size="lg"
                 className="bg-white text-blue-600 hover:bg-blue-50 text-lg px-8 py-4 rounded-full shadow-lg"
               >
                 Get Started Today
-                <motion.div animate={{ x: [0, 5, 0] }} transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}>
+                <div>
                   <ArrowRight className="ml-2 h-5 w-5" />
-                </motion.div>
+                </div>
               </Button>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
 
           {/* Floating Health Card Mockup */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8, rotateY: -30 }}
-            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-            transition={{ duration: 1, delay: 0.3 }}
+          <div
             className="relative"
           >
-            <motion.div
-              animate={{
-                rotateY: [0, 5, 0, -5, 0],
-                rotateX: [0, 2, 0, -2, 0],
-              }}
-              transition={{ repeat: Number.POSITIVE_INFINITY, duration: 6, ease: "easeInOut" }}
+            <div
               className="perspective-1000"
             >
               <Card className="w-80 h-48 mx-auto bg-gradient-to-br from-white to-blue-50 shadow-2xl border-0">
@@ -97,8 +82,8 @@ export default function LandingPage() {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         </div>
       </section>
 

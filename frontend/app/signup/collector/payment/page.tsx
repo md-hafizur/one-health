@@ -10,38 +10,33 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { PaymentModal } from "@/components/payment-modal"
 import { toast } from "sonner"
+import { useSelector } from "react-redux"
+import { selectSignup } from "@/lib/redux/signupSlice"
 
 export default function CollectorPaymentPage() {
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "processing" | "success" | "failed">("pending")
   const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [applicationData, setApplicationData] = useState<any>(null)
 
   const searchParams = useSearchParams()
   const router = useRouter()
+  const signupData = useSelector(selectSignup)
   const applicationId = searchParams.get("application")
 
   useEffect(() => {
-    // Load application data from localStorage
-    const storedData = localStorage.getItem("pendingCollectorSignup")
-    if (storedData) {
-      const data = JSON.parse(storedData)
-      if (data.applicationId === applicationId) {
-        // Check if verification is complete
-        if (!data.verified) {
-          toast.error("Please complete verification first")
-          router.push(`/signup/collector/verify?application=${applicationId}`)
-          return
-        }
-        setApplicationData(data)
-      } else {
-        toast.error("Invalid application ID")
-        router.push("/login")
-      }
-    } else {
-      toast.error("No pending application found")
+    if (!signupData.applicationId || signupData.applicationId !== applicationId) {
+      toast.error("No pending application found or invalid ID.")
       router.push("/login")
+      return
     }
-  }, [applicationId, router])
+
+    if (!signupData.verified) {
+      toast.error("Please complete verification first")
+      router.push(`/signup/collector/verify?application=${applicationId}`)
+      return
+    }
+  }, [applicationId, router, signupData])
+
+  
 
   const handlePayNow = () => {
     setShowPaymentModal(true)
@@ -53,12 +48,12 @@ export default function CollectorPaymentPage() {
 
     // Update application data with payment status
     const updatedData = {
-      ...applicationData,
+      ...signupData,
       paymentStatus: "paid",
       paidAmount: 1000,
       paidAt: new Date().toISOString(),
     }
-    localStorage.setItem("pendingCollectorSignup", JSON.stringify(updatedData))
+    // localStorage.setItem("pendingCollectorSignup", JSON.stringify(updatedData))
 
     toast.success("Payment successful! Your application is now under review.")
 
@@ -73,19 +68,8 @@ export default function CollectorPaymentPage() {
     toast.error("Payment failed. Please try again.")
   }
 
-  if (!applicationData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading application data...</p>
-        </div>
-      </div>
-    )
-  }
-
-  const isPhoneVerification = applicationData.verificationType === "phone"
-  const contactInfo = isPhoneVerification ? applicationData.phone : applicationData.email
+  const isPhoneVerification = signupData.contactType === "phone"
+  const contactInfo = signupData.contact
   const ContactIcon = isPhoneVerification ? Phone : Mail
 
   return (
@@ -172,12 +156,12 @@ export default function CollectorPaymentPage() {
                       <div className="space-y-3">
                         <div>
                           <p className="text-sm text-gray-600">Application ID</p>
-                          <p className="font-mono font-medium">{applicationData.applicationId}</p>
+                          <p className="font-mono font-medium">{signupData.applicationId}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Applicant Name</p>
                           <p className="font-medium">
-                            {applicationData.firstName} {applicationData.lastName}
+                            {signupData.firstName} {signupData.lastName}
                           </p>
                         </div>
                         <div>
@@ -347,17 +331,16 @@ export default function CollectorPaymentPage() {
           )}
         </div>
       </div>
-
-      {/* Payment Modal */}
+        {/* Payment Modal */}
       <PaymentModal
         open={showPaymentModal}
         onOpenChange={setShowPaymentModal}
         amount={1000}
         onSuccess={handlePaymentSuccess}
         userInfo={{
-          name: `${applicationData.firstName} ${applicationData.lastName}`,
-          id: applicationData.applicationId,
-          serviceCode: `DC-REG-${applicationData.applicationId}`,
+          name: `${signupData.firstName} ${signupData.lastName}`,
+          id: signupData.applicationId || '',
+          serviceCode: `DC-REG-${signupData.applicationId}`,
         }}
       />
     </div>

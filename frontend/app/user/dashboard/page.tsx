@@ -1,6 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useSelector } from "react-redux"
+import { selectAuth } from "@/lib/redux/authSlice"
+import { toast } from "sonner"
+import { getCurrentBrowserFingerPrint } from "@rajesh896/broprint.js"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,6 +27,57 @@ import Link from "next/link"
 
 export default function UserDashboard() {
   const [showQR, setShowQR] = useState(false)
+  const router = useRouter()
+  const [visitorId, setVisitorId] = useState<string | null>(null)
+  const authData = useSelector(selectAuth)
+
+  useEffect(() => {
+    if (!authData.isAuthenticated || authData.userRole !== "user") {
+      router.push("/login");
+    }
+
+    const getFingerprint = async () => {
+      const fp = await getCurrentBrowserFingerPrint();
+      setVisitorId(fp);
+    };
+    getFingerprint();
+  }, [authData.isAuthenticated, authData.userRole, router]);
+
+  const handleLogout = async () => {
+    console.log("Logout button clicked.")
+    if (!visitorId) {
+      console.log("Visitor ID not available.", visitorId)
+      toast.error("Visitor ID not generated. Please try again.")
+      return
+    }
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    console.log("API URL for logout:", apiUrl)
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const response = await fetch(`${apiUrl}/auth/logout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Visitor-ID": visitorId,
+        },
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        toast.error(result.message || "Logout failed.")
+        return
+      }
+
+      toast.success(result.message || "Logged out successfully!")
+      router.push("/login")
+    } catch (error) {
+      console.error("Logout Error:", error)
+      toast.error("An unexpected error occurred during logout.")
+    }
+  }
 
   const subAccounts = [
     { name: "Sarah Ahmed", id: "OH-2024-1248", relation: "Daughter", age: 12 },
@@ -63,12 +119,10 @@ export default function UserDashboard() {
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 Active Member
               </Badge>
-              <Link href="/login">
-                <Button variant="outline" size="sm">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </Button>
-              </Link>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>
