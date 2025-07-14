@@ -11,6 +11,7 @@ interface AuthState {
   applicationId: string;
   contact: string | null;
   contactType: string | null;
+  paymentMade: boolean; // Add paymentMade to the state
   allowLoginAccessWhileAuthenticated: boolean;
   isInitializing: boolean; // New state to track initialization
 }
@@ -25,6 +26,7 @@ const initialState: AuthState = {
   applicationId: "",
   contact: null,
   contactType: null,
+  paymentMade: false, // Initialize paymentMade
   allowLoginAccessWhileAuthenticated: false,
   isInitializing: true, // Start with initializing true
 };
@@ -44,6 +46,7 @@ const authSlice = createSlice({
         applicationId: string;
         contact: string | null;
         contactType: string | null;
+        paymentMade: boolean; // Add paymentMade to the payload
       }>
     ) => {
       state.isAuthenticated = true;
@@ -55,6 +58,7 @@ const authSlice = createSlice({
       state.applicationId = action.payload.applicationId;
       state.contact = action.payload.contact;
       state.contactType = action.payload.contactType;
+      state.paymentMade = action.payload.paymentMade; // Set paymentMade
       state.isInitializing = false; // Set to false on login
     },
     setLogout: (state) => {

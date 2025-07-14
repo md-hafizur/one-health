@@ -20,21 +20,21 @@ export default function CollectorPaymentPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const signupData = useSelector(selectSignup)
-  const applicationId = searchParams.get("application")
+  const applicationId = searchParams.get("application") || 2
 
-  useEffect(() => {
-    if (!signupData.applicationId || signupData.applicationId !== applicationId) {
-      toast.error("No pending application found or invalid ID.")
-      router.push("/login")
-      return
-    }
+  // useEffect(() => {
+  //   // if (!signupData.applicationId) {
+  //   //   toast.error("No pending application found or invalid ID.")
+  //   //   router.push("/login")
+  //   //   return
+  //   // }
 
-    if (!signupData.verified) {
-      toast.error("Please complete verification first")
-      router.push(`/signup/collector/verify?application=${applicationId}`)
-      return
-    }
-  }, [applicationId, router, signupData])
+  //   if (!signupData.verified) {
+  //     toast.error("Please complete verification first")
+  //     router.push(`/signup/collector/verify?application=${applicationId}`)
+  //     return
+  //   }
+  // }, [applicationId, signupData.applicationId, signupData.verified]);
 
   
 
@@ -55,11 +55,11 @@ export default function CollectorPaymentPage() {
     }
     // localStorage.setItem("pendingCollectorSignup", JSON.stringify(updatedData))
 
-    toast.success("Payment successful! Your application is now under review.")
+    toast.success("Payment successful! Your application is now under review. Redirecting to login...")
 
-    // Redirect to success page after 3 seconds
+    // Redirect to login page after 3 seconds
     setTimeout(() => {
-      router.push("/signup/collector/success")
+      router.push("/login")
     }, 3000)
   }
 

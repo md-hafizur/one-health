@@ -33,7 +33,7 @@ export default function CollectorDashboard() {
         router.push("/signup/collector/verify");
       }
     }
-  }, [authData.isAuthenticated, authData.isInitializing, authData.userRole, authData.phoneVerified, authData.emailVerified, router]);
+  }, [authData.isAuthenticated, authData.isInitializing, authData.userRole, authData.phoneVerified, authData.emailVerified]);
 
   useEffect(() => {
     const getFingerprint = async () => {

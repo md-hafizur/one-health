@@ -51,10 +51,10 @@ export default function LoginPage() {
   }, [isClient]);
 
   useEffect(() => {
-    if (isClient && authData.isAuthenticated && !authData.allowLoginAccessWhileAuthenticated) {
+    if (isClient && authData.isAuthenticated && (authData.phoneVerified || authData.emailVerified) && !authData.allowLoginAccessWhileAuthenticated) {
       router.push("/collector/dashboard"); // Or appropriate dashboard based on role
     }
-  }, [isClient, authData.isAuthenticated, authData.allowLoginAccessWhileAuthenticated, router]);
+  }, [isClient, authData.isAuthenticated, authData.paymentMade, authData.allowLoginAccessWhileAuthenticated]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -113,12 +113,11 @@ export default function LoginPage() {
         const firstName = result.first_name;
         const lastName = result.last_name;
 
-        dispatch(setLogin({ role: "collector", phoneVerified: phoneVerified, emailVerified: emailVerified, applicationId: applicationId, contact: contact, contactType: contactType, firstName: firstName, lastName: lastName }));
+        const paymentMade = result.payment_made ?? false;
 
-        if (
-          (contactType === "phone" && !phoneVerified) ||
-          (contactType === "email" && !emailVerified)
-        ) {
+        dispatch(setLogin({ role: "collector", phoneVerified: phoneVerified, emailVerified: emailVerified, applicationId: applicationId, contact: contact, contactType: contactType, firstName: firstName, lastName: lastName, paymentMade: paymentMade }));
+
+        if ((contactType === "phone" && !phoneVerified) || (contactType === "email" && !emailVerified)) {
           console.log(
             "Login Page - Redirecting to verification page as contact info is not verified.",
           )
@@ -137,6 +136,11 @@ export default function LoginPage() {
           localStorage.setItem("onehealth_last_name", lastName || "");
 
           router.push("/signup/collector/verify");
+        } else if (!paymentMade) {
+          console.log("Login Page - Redirecting to payment page as payment is not made.");
+          toast.error("Please complete the payment to proceed.");
+          // router.push(`/signup/collector/payment?application=${applicationId}`);
+          router.push("/collector/dashboard");
         } else {
           console.log("Login Page - Redirecting to dashboard.")
           router.push("/collector/dashboard")
@@ -322,22 +326,7 @@ export default function LoginPage() {
                 ))}
               </TabsList>
 
-              {/* Temporary button to toggle login page access for authenticated users */}
-              {authData.isAuthenticated && (
-                <div className="text-center mb-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => dispatch(setAllowLoginAccess(!authData.allowLoginAccessWhileAuthenticated))}
-                  >
-                    {authData.allowLoginAccessWhileAuthenticated
-                      ? "Disable Login Page Access (Redirect)"
-                      : "Enable Login Page Access (Stay)"}
-                  </Button>
-                  <p className="text-xs text-gray-500 mt-1">
-                    (For demonstration: Toggles whether authenticated users can view this page)
-                  </p>
-                </div>
-              )}
+              
 
               {roles.map((role) => {
                 if (role.id === "collector") {

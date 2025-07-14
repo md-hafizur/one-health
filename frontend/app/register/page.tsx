@@ -88,6 +88,9 @@ export default function RegisterPage() {
     toast.success("Payment successful! Digital card will be issued.")
   }
 
+// Similar for fetchUpazilas, fetchUnions, etc.
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
       {/* Header */}
@@ -243,55 +246,95 @@ export default function RegisterPage() {
                   </div>
 
                   {/* Address Information */}
-                  <div>
-                    <Label htmlFor="presentAddress">Present Address *</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Textarea
-                        id="presentAddress"
-                        value={formData.presentAddress}
-                        onChange={(e) => setFormData({ ...formData, presentAddress: e.target.value })}
-                        placeholder="Enter complete present address"
-                        className="pl-10 min-h-[100px]"
-                        required
-                      />
-                    </div>
-                  </div>
-
                   <div className="grid md:grid-cols-2 gap-6">
+                    {/* Division */}
                     <div>
-                      <Label htmlFor="district">District *</Label>
-                      <Select
-                        value={formData.district}
-                        onValueChange={(value) => setFormData({ ...formData, district: value })}
-                      >
+                      <Label htmlFor="division">Division *</Label>
+                      <Select value={formData.division} onValueChange={(value) => setFormData({ ...formData, division: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select division" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Dhaka</SelectItem>
+                          <SelectItem value="2">Chittagong</SelectItem>
+                          <SelectItem value="3">Sylhet</SelectItem>
+                          <SelectItem value="4">Rajshahi</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Zilla (District) */}
+                    <div>
+                      <Label htmlFor="zilla">District *</Label>
+                      <Select value={formData.zilla} onValueChange={(value) => setFormData({ ...formData, zilla: value })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select district" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="dhaka">Dhaka</SelectItem>
-                          <SelectItem value="chittagong">Chittagong</SelectItem>
-                          <SelectItem value="sylhet">Sylhet</SelectItem>
-                          <SelectItem value="rajshahi">Rajshahi</SelectItem>
-                          <SelectItem value="khulna">Khulna</SelectItem>
-                          <SelectItem value="barisal">Barisal</SelectItem>
-                          <SelectItem value="rangpur">Rangpur</SelectItem>
-                          <SelectItem value="mymensingh">Mymensingh</SelectItem>
+                          <SelectItem value="1">Comilla</SelectItem>
+                          <SelectItem value="2">Gazipur</SelectItem>
+                          <SelectItem value="3">Narayanganj</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Upazila */}
                     <div>
                       <Label htmlFor="upazila">Upazila *</Label>
-                      <Input
-                        id="upazila"
-                        value={formData.upazila}
-                        onChange={(e) => setFormData({ ...formData, upazila: e.target.value })}
-                        placeholder="Enter upazila"
-                        required
-                      />
+                      <Select value={formData.upazila} onValueChange={(value) => setFormData({ ...formData, upazila: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select upazila" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Savar</SelectItem>
+                          <SelectItem value="2">Keraniganj</SelectItem>
+                          <SelectItem value="3">Dohar</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Union */}
+                    <div>
+                      <Label htmlFor="union">Union *</Label>
+                      <Select value={formData.union} onValueChange={(value) => setFormData({ ...formData, union: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select union" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Konda</SelectItem>
+                          <SelectItem value="2">Zinjira</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Village */}
+                    <div>
+                      <Label htmlFor="village">Village *</Label>
+                      <Select value={formData.village} onValueChange={(value) => setFormData({ ...formData, village: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select village" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Nabinagar</SelectItem>
+                          <SelectItem value="2">Mollartek</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Para */}
+                    <div>
+                      <Label htmlFor="para">Para *</Label>
+                      <Select value={formData.para} onValueChange={(value) => setFormData({ ...formData, para: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select para" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">East Side</SelectItem>
+                          <SelectItem value="2">West Colony</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-
                   {/* Service Code */}
                   <div>
                     <Label htmlFor="serviceCode">Service Code</Label>

@@ -29,7 +29,7 @@ export default function AdminDashboard() {
     if (!authData.isAuthenticated || authData.userRole !== "admin") {
       router.push("/login");
     }
-  }, [authData.isAuthenticated, authData.userRole, router]);
+  }, [authData.isAuthenticated, authData.userRole]);
 
   const stats = [
     {
