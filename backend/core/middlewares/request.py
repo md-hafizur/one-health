@@ -6,8 +6,8 @@ class ApiRequestMiddleware(object):
         self.get_response = get_response
 
     def __call__(self, request):
-        visitor_id = request.COOKIES.get("access-token") or request.headers.get(
-            "access-token"
+        visitor_id = request.COOKIES.get("X-Visitor-ID") or request.headers.get(
+            "X-Visitor-ID"
         )
         if not visitor_id:
             response = DictResponse("Bad request", status=400)

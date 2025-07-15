@@ -2,7 +2,7 @@ from django.contrib.auth.models import AbstractUser
 from core.utils.modeler import BaseModel
 from django.db import models
 from django.db.models import Q
-from apps.address.models import Union
+from apps.address.models import Address
 from core.validators import phone_validator
 
 class Role(models.Model):
@@ -29,7 +29,7 @@ class User(AbstractUser, BaseModel):
         null=True,
         blank=True,
         on_delete=models.CASCADE,
-        related_name='sub_users'
+        related_name='children'
     )
     username = models.CharField(
         max_length=150,
@@ -88,7 +88,13 @@ class UserProfile(models.Model):
     name_en = models.CharField(max_length=100)
     name_bn = models.CharField(max_length=100)
 
-    phone = models.CharField(max_length=11, validators=[phone_validator])
+    phone = models.CharField(
+        max_length=11,
+        validators=[phone_validator],
+        unique=False,
+        null=True,
+        blank=True,
+    )
     gurdian_phone = models.CharField(max_length=11, validators=[phone_validator], blank=True, null=True)
 
     nid = models.CharField(max_length=17, blank=True, null=True)
@@ -111,9 +117,9 @@ class UserProfile(models.Model):
     email = models.EmailField(blank=True, null=True)
 
     # Address
-    address = models.ForeignKey(Union, on_delete=models.SET_NULL, null=True, blank=True, related_name='profiles')
+    address = models.OneToOneField(Address, on_delete=models.SET_NULL, null=True, blank=True)
 
-    photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    photo = models.ImageField(upload_to='photos/', blank=True, null=True)
     signature = models.ImageField(upload_to='signatures/', blank=True, null=True)
 
     def __str__(self):
