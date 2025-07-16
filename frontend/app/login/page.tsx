@@ -51,7 +51,7 @@ export default function LoginPage() {
   }, [isClient]);
 
   useEffect(() => {
-    if (isClient && authData.isAuthenticated && (authData.phoneVerified || authData.emailVerified) && !authData.allowLoginAccessWhileAuthenticated) {
+    if (isClient && authData.isAuthenticated && (authData.phoneVerified || authData.emailVerified)  && !authData.allowLoginAccessWhileAuthenticated) {
       router.push("/collector/dashboard"); // Or appropriate dashboard based on role
     }
   }, [isClient, authData.isAuthenticated, authData.paymentMade, authData.allowLoginAccessWhileAuthenticated]);

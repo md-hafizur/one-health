@@ -13,20 +13,34 @@ import { ArrowLeft, User, Phone, MapPin, Upload, FileImage, PenTool, CreditCard,
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-
 export default function RegisterPage() {
   const [step, setStep] = useState(1) // 1: Form, 2: Verification, 3: Payment, 4: Success
+  const [submittedData, setSubmittedData] = useState<any>(null);
+  const [isVerified, setIsVerified] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
-    fatherName: "",
-    motherName: "",
-    spouseName: "",
-    email: "",
-    phone: "",
-    presentAddress: "",
-    district: "",
-    upazila: "",
-    serviceCode: "", // Initialize as empty, will be set in useEffect
+    first_name_en: '',
+    last_name_en: '',
+    name_bn: '',
+    contactMethod: 'phone', // 'phone' or 'email'
+    contactValue: '',
+    nid: '',
+    father_name_en: '',
+    father_name_bn: '',
+    mother_name_en: '',
+    mother_name_bn: '',
+    spouse_name_en: '',
+    spouse_name_bn: '',
+    occupation: '',
+    blood_group: '',
+    data_of_birth: '',
+    division: '',
+    zilla: '',
+    upazila: '',
+    union: '',
+    postOffice: '',
+    village: '',
+    para: '',
+    serviceCode: '',
     photo: null as File | null,
     signature: null as File | null,
   })
@@ -57,26 +71,116 @@ export default function RegisterPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    // Check if contact information is provided
-    if (!formData.phone && !formData.email) {
-      toast.error("Please provide either phone number or email address")
-      return
-    }
+  const { contactMethod, contactValue, first_name_en, last_name_en } = formData;
 
-    // Store registration data and proceed to verification
-    const registrationData = {
-      ...formData,
-      registrationId: `REG-${Date.now().toString().slice(-6)}`, // Generate on client side
-      verificationType: formData.phone ? "phone" : "email",
-    }
-
-    localStorage.setItem("pendingUserRegistration", JSON.stringify(registrationData))
-    setStep(2)
-    toast.success("Registration data saved! Please verify your contact information.")
+  if (!contactValue) {
+    toast.error(`Please provide a ${contactMethod === "phone" ? "phone number" : "email address"}`);
+    return;
   }
+
+  console.log("Current formData state:", formData); // Debugging: Check formData before submission
+
+const firstName = first_name_en;
+const lastName = last_name_en;
+
+  const buildAddressPayload = () => ({
+    division: +formData.division,
+    zilla: +formData.zilla,
+    upazila: +formData.upazila,
+    union: +formData.union,
+    post_office: +formData.postOffice,
+    village: +formData.village,
+    para: +formData.para,
+  });
+
+  const buildPostData = () => {
+    const data = {
+      user_data: {
+        first_name: firstName,
+        last_name: lastName,
+        username: contactValue,
+        email: contactMethod === 'email' ? contactValue : undefined,
+        phone: contactMethod === 'phone' ? contactValue : undefined,
+      },
+      user_profile: {
+        name_en: `${formData.first_name_en} ${formData.last_name_en}`,
+        name_bn: formData.name_bn,
+        phone: contactMethod === 'phone' ? contactValue : '',
+        gurdian_phone: '',
+        nid: formData.nid,
+        gurdian_nid: '',
+        father_name_en: formData.father_name_en,
+        father_name_bn: formData.father_name_bn,
+        mother_name_en: formData.mother_name_en,
+        mother_name_bn: formData.mother_name_bn,
+        spouse_name_en: formData.spouse_name_en,
+        spouse_name_bn: formData.spouse_name_bn,
+        occupation: formData.occupation,
+        blood_group: formData.blood_group,
+        data_of_birth: formData.data_of_birth,
+        email: contactMethod === 'email' ? contactValue : '',
+        address: buildAddressPayload(),
+      },
+    };
+
+    const form = new FormData();
+    form.append('user_data', JSON.stringify(data.user_data));
+
+    // Create a copy of user_profile data without photo and signature for JSON stringify
+    const userProfileJsonData = {
+      ...data.user_profile,
+      photo: undefined, // Exclude photo from JSON
+      signature: undefined, // Exclude signature from JSON
+    };
+    form.append('user_profile', JSON.stringify(userProfileJsonData));
+
+    if (formData.photo) {
+      form.append('user_profile.photo', formData.photo);
+    }
+    if (formData.signature) {
+      form.append('user_profile.signature', formData.signature);
+    }
+
+    console.log("FormData object contents:"); // Debugging: Inspect FormData
+    for (let pair of form.entries()) {
+      console.log(pair[0]+ ', ' + pair[1]);
+    }
+
+    return form;
+  };
+
+  try {
+    const response = await fetch(`${apiUrl}/accounts/register?identity=DataCollector&for_account=public`, {
+      method: 'POST',
+      body: buildPostData(),
+      credentials: 'include',
+    });
+
+    const responseData = await response.json();
+
+    if (response.ok) {
+      const registrationData = {
+        ...formData,
+        ...responseData,
+        registrationId: `REG-${Date.now().toString().slice(-6)}`,
+        verificationType: contactMethod,
+        contactValue,
+      };
+      localStorage.setItem("pendingUserRegistration", JSON.stringify(registrationData));
+      setSubmittedData(registrationData);
+      setStep(2);
+      toast.success("Registration data submitted! Please verify your contact information.");
+    } else {
+      toast.error(`Registration failed: ${responseData?.detail || JSON.stringify(responseData)}`);
+    }
+  } catch (error) {
+    toast.error("An error occurred while submitting the form.");
+  }
+};
+
 
   const handleVerificationComplete = () => {
     setStep(3)
@@ -88,6 +192,90 @@ export default function RegisterPage() {
     toast.success("Payment successful! Digital card will be issued.")
   }
 
+
+  const [divisions, setDivisions] = useState([]);
+  const [zillas, setZillas] = useState([]);
+  const [upazilas, setUpazilas] = useState([]);
+  const [unions, setUnions] = useState([]);
+  const [postOffices, setPostOffices] = useState([]);
+  const [villages, setVillages] = useState([]);
+  const [paras, setParas] = useState([]);
+  
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const addressurl = apiUrl+'/address';
+
+  useEffect(() => {
+    fetch(`${addressurl}/divisions/`)
+      .then(res => res.json())
+      .then(setDivisions);
+  }, []);
+
+  useEffect(() => {
+    if (formData.division) {
+      fetch(`${addressurl}/zillas/?division=${formData.division}`)
+        .then(res => res.json())
+        .then(setZillas);
+    } else {
+      setZillas([]);
+    }
+    setFormData(prev => ({ ...prev, zilla: '', upazila: '', union: '', village: '', para: '' }));
+  }, [formData.division]);
+
+  useEffect(() => {
+    if (formData.zilla) {
+      fetch(`${addressurl}/upazilas/?zilla=${formData.zilla}`)
+        .then(res => res.json())
+        .then(setUpazilas);
+    } else {
+      setUpazilas([]);
+    }
+    setFormData(prev => ({ ...prev, upazila: '', union: '', village: '', para: '' }));
+  }, [formData.zilla]);
+
+  useEffect(() => {
+    if (formData.upazila) {
+      fetch(`${addressurl}/unions/?upazila=${formData.upazila}`)
+        .then(res => res.json())
+        .then(setUnions);
+    } else {
+      setUnions([]);
+    }
+    setFormData(prev => ({ ...prev, union: '', village: '', para: '' }));
+  }, [formData.upazila]);
+
+  useEffect(() => {
+    if (formData.union) {
+      fetch(`${addressurl}/villages/?union=${formData.union}`)
+        .then(res => res.json())
+        .then(setVillages);
+    } else {
+      setVillages([]);
+    }
+    setFormData(prev => ({ ...prev, village: '', para: '' }));
+  }, [formData.union]);
+
+    useEffect(() => {
+    if (formData.union) {
+      fetch(`${addressurl}/postoffices/?union=${formData.union}`)
+        .then(res => res.json())
+        .then(setPostOffices);
+    } else {
+      setPostOffices([]);
+    }
+    setFormData(prev => ({ ...prev, postOffice: '', village: '', para: '' }));
+  }, [formData.union]);
+
+
+  useEffect(() => {
+    if (formData.village) {
+      fetch(`${addressurl}/paras/?village=${formData.village}`)
+        .then(res => res.json())
+        .then(setParas);
+    } else {
+      setParas([]);
+    }
+    setFormData(prev => ({ ...prev, para: '' }));
+  }, [formData.village]);
 // Similar for fetchUpazilas, fetchUnions, etc.
 
 
@@ -165,187 +353,320 @@ export default function RegisterPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Personal Information */}
                   <div className="grid md:grid-cols-2 gap-6">
+                    {/* Name */}
                     <div>
-                      <Label htmlFor="name">Full Name *</Label>
+                      <Label htmlFor="first_name_en">First Name (English) *</Label>
                       <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Enter full name in English"
+                        id="first_name_en"
+                        value={formData.first_name_en}
+                        onChange={(e) => setFormData({ ...formData, first_name_en: e.target.value })}
+                        placeholder="Enter first name in English"
                         required
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="fatherName">Father's Name *</Label>
-                      <Input
-                        id="fatherName"
-                        value={formData.fatherName}
-                        onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
-                        placeholder="Enter father's name"
-                        required
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <Label htmlFor="motherName">Mother's Name *</Label>
+                      <Label htmlFor="last_name_en">Last Name (English) *</Label>
                       <Input
-                        id="motherName"
-                        value={formData.motherName}
-                        onChange={(e) => setFormData({ ...formData, motherName: e.target.value })}
-                        placeholder="Enter mother's name"
+                        id="last_name_en"
+                        value={formData.last_name_en}
+                        onChange={(e) => setFormData({ ...formData, last_name_en: e.target.value })}
+                        placeholder="Enter last name in English"
                         required
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="spouseName">Spouse Name</Label>
-                      <Input
-                        id="spouseName"
-                        value={formData.spouseName}
-                        onChange={(e) => setFormData({ ...formData, spouseName: e.target.value })}
-                        placeholder="Enter spouse name (if applicable)"
-                      />
-                    </div>
-                  </div>
 
-                  {/* Contact Information */}
-                  <div>
-                    <Label htmlFor="contact">Phone Number or Email Address *</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <div>
+                      <Label htmlFor="name_bn">Name (Bangla) *</Label>
                       <Input
-                        id="contact"
-                        value={formData.phone || formData.email}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          // Auto-detect if it's email or phone
-                          if (value.includes("@")) {
-                            setFormData({ ...formData, email: value, phone: "" })
-                          } else {
-                            setFormData({ ...formData, phone: value, email: "" })
-                          }
-                        }}
-                        placeholder="Enter phone number (+880 1234-567890) or email address"
-                        className="pl-10"
+                        id="name_bn"
+                        value={formData.name_bn}
+                        onChange={(e) => setFormData({ ...formData, name_bn: e.target.value })}
+                        placeholder="বাংলায় নাম লিখুন"
                         required
                       />
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      You can enter either phone number or email address for verification
-                    </p>
-                  </div>
 
-                  <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                    <p>
-                      📝 <strong>Note:</strong> The contact information will be used for verification and sending login
-                      credentials.
-                    </p>
-                  </div>
+                    {/* Contact Info */}
+                    <div className="md:col-span-2 grid grid-cols-3 gap-4">
+                      <div className="col-span-1">
+                        <Label htmlFor="contactMethod">Contact Method *</Label>
+                        <Select
+                          value={formData.contactMethod}
+                          onValueChange={(value) => setFormData({ ...formData, contactMethod: value })}
+                        >
+                          <SelectTrigger id="contactMethod">
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="phone">Phone</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2">
+                        <Label htmlFor="contactValue">Contact Value *</Label>
+                        <Input
+                          id="contactValue"
+                          type={formData.contactMethod === "phone" ? "tel" : "email"}
+                          value={formData.contactValue}
+                          onChange={(e) => setFormData({ ...formData, contactValue: e.target.value })}
+                          placeholder={formData.contactMethod === "phone" ? "Enter phone number" : "Enter email address"}
+                          required
+                          maxLength={formData.contactMethod === "phone" ? 11 : undefined}
+                        />
+                      </div>
+                    </div>
+
+                    {/* NID Info */}
+                    <div>
+                      <Label htmlFor="nid">NID</Label>
+                      <Input
+                        id="nid"
+                        value={formData.nid}
+                        onChange={(e) => setFormData({ ...formData, nid: e.target.value })}
+                        placeholder="Enter NID number"
+                        maxLength={17}
+                      />
+                    </div>
+
+                    {/* DOB, Blood Group, Occupation */}
+                    <div>
+                      <Label htmlFor="data_of_birth">Date of Birth</Label>
+                      <Input
+                        id="data_of_birth"
+                        type="date"
+                        value={formData.data_of_birth}
+                        onChange={(e) => setFormData({ ...formData, data_of_birth: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="blood_group">Blood Group</Label>
+                      <Input
+                        id="blood_group"
+                        value={formData.blood_group}
+                        onChange={(e) => setFormData({ ...formData, blood_group: e.target.value })}
+                        placeholder="e.g. A+, B-, O+"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <Label htmlFor="occupation">Occupation</Label>
+                      <Input
+                        id="occupation"
+                        value={formData.occupation}
+                        onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
+                        placeholder="Enter occupation"
+                      />
+                    </div>
+
+                    {/* Family Info */}
+                    <div>
+                      <Label htmlFor="father_name_en">Father's Name (English)</Label>
+                      <Input
+                        id="father_name_en"
+                        value={formData.father_name_en}
+                        onChange={(e) => setFormData({ ...formData, father_name_en: e.target.value })}
+                        placeholder="Father's name in English"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="father_name_bn">Father's Name (Bangla)</Label>
+                      <Input
+                        id="father_name_bn"
+                        value={formData.father_name_bn}
+                        onChange={(e) => setFormData({ ...formData, father_name_bn: e.target.value })}
+                        placeholder="বাংলায় বাবার নাম"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="mother_name_en">Mother's Name (English)</Label>
+                      <Input
+                        id="mother_name_en"
+                        value={formData.mother_name_en}
+                        onChange={(e) => setFormData({ ...formData, mother_name_en: e.target.value })}
+                        placeholder="Mother's name in English"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="mother_name_bn">Mother's Name (Bangla)</Label>
+                      <Input
+                        id="mother_name_bn"
+                        value={formData.mother_name_bn}
+                        onChange={(e) => setFormData({ ...formData, mother_name_bn: e.target.value })}
+                        placeholder="বাংলায় মায়ের নাম"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="spouse_name_en">Spouse Name (English)</Label>
+                      <Input
+                        id="spouse_name_en"
+                        value={formData.spouse_name_en}
+                        onChange={(e) => setFormData({ ...formData, spouse_name_en: e.target.value })}
+                        placeholder="Spouse name in English"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="spouse_name_bn">Spouse Name (Bangla)</Label>
+                      <Input
+                        id="spouse_name_bn"
+                        value={formData.spouse_name_bn}
+                        onChange={(e) => setFormData({ ...formData, spouse_name_bn: e.target.value })}
+                        placeholder="বাংলায় স্ত্রীর নাম"
+                      />
+                    </div>
+
+                    </div>
+
 
                   {/* Address Information */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* Division */}
-                    <div>
-                      <Label htmlFor="division">Division *</Label>
-                      <Select value={formData.division} onValueChange={(value) => setFormData({ ...formData, division: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select division" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Dhaka</SelectItem>
-                          <SelectItem value="2">Chittagong</SelectItem>
-                          <SelectItem value="3">Sylhet</SelectItem>
-                          <SelectItem value="4">Rajshahi</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Zilla (District) */}
-                    <div>
-                      <Label htmlFor="zilla">District *</Label>
-                      <Select value={formData.zilla} onValueChange={(value) => setFormData({ ...formData, zilla: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select district" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Comilla</SelectItem>
-                          <SelectItem value="2">Gazipur</SelectItem>
-                          <SelectItem value="3">Narayanganj</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Upazila */}
-                    <div>
-                      <Label htmlFor="upazila">Upazila *</Label>
-                      <Select value={formData.upazila} onValueChange={(value) => setFormData({ ...formData, upazila: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select upazila" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Savar</SelectItem>
-                          <SelectItem value="2">Keraniganj</SelectItem>
-                          <SelectItem value="3">Dohar</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Union */}
-                    <div>
-                      <Label htmlFor="union">Union *</Label>
-                      <Select value={formData.union} onValueChange={(value) => setFormData({ ...formData, union: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select union" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Konda</SelectItem>
-                          <SelectItem value="2">Zinjira</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Village */}
-                    <div>
-                      <Label htmlFor="village">Village *</Label>
-                      <Select value={formData.village} onValueChange={(value) => setFormData({ ...formData, village: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select village" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Nabinagar</SelectItem>
-                          <SelectItem value="2">Mollartek</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Para */}
-                    <div>
-                      <Label htmlFor="para">Para *</Label>
-                      <Select value={formData.para} onValueChange={(value) => setFormData({ ...formData, para: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select para" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">East Side</SelectItem>
-                          <SelectItem value="2">West Colony</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  {/* Service Code */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Division */}
                   <div>
-                    <Label htmlFor="serviceCode">Service Code</Label>
-                    <Input
-                      id="serviceCode"
-                      value={formData.serviceCode}
-                      onChange={(e) => setFormData({ ...formData, serviceCode: e.target.value })}
-                      placeholder="Auto-generated service code"
-                      readOnly
-                    />
+                    <Label htmlFor="division">Division *</Label>
+                    <Select
+                      value={formData.division}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, division: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select division" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {divisions.map((item: any) => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.name_en}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  {/* Zilla */}
+                  <div>
+                    <Label htmlFor="zilla">District *</Label>
+                    <Select
+                      value={formData.zilla}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, zilla: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select district" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {zillas.map((item: any) => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.name_en}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Upazila */}
+                  <div>
+                    <Label htmlFor="upazila">Upazila *</Label>
+                    <Select
+                      value={formData.upazila}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, upazila: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select upazila" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {upazilas.map((item: any) => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.name_en}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Union */}
+                  <div>
+                    <Label htmlFor="union">Union *</Label>
+                    <Select
+                      value={formData.union}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, union: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select union" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unions.map((item: any) => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.name_en}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Post Office */}
+                  <div>
+                    <Label htmlFor="postOffice">Post Office *</Label>
+                    <Select
+                      value={formData.postOffice}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, postOffice: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select post office" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {postOffices.map((item: any) => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.name_en} ({item.postal_code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="village">Village *</Label>
+                    <Select
+                      value={formData.village}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, village: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select village" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {villages.map((item: any) => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.name_en}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Para */}
+                  <div>
+                    <Label htmlFor="para">Para *</Label>
+                    <Select
+                      value={formData.para}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, para: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select para" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paras.map((item: any) => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.name_en}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
                   {/* File Uploads */}
                   <div className="grid md:grid-cols-2 gap-6">
@@ -416,15 +737,15 @@ export default function RegisterPage() {
         )}
 
         {/* Step 2: Verification */}
-        {step === 2 && (
-          <UserVerificationStep onVerificationComplete={handleVerificationComplete} registrationData={formData} />
+        {step === 2 && submittedData && (
+          <UserVerificationStep onVerificationComplete={handleVerificationComplete} registrationData={submittedData} />
         )}
 
         {/* Step 3: Payment */}
-        {step === 3 && <UserPaymentStep onPaymentSuccess={handlePaymentSuccess} registrationData={formData} />}
+        {step === 3 && submittedData && <UserPaymentStep onPaymentSuccess={handlePaymentSuccess} registrationData={submittedData} />}
 
         {/* Step 4: Success */}
-        {step === 4 && <UserSuccessStep registrationData={formData} />}
+        {step === 4 && submittedData && <UserSuccessStep registrationData={submittedData} onRegisterAnotherUser={() => { setStep(1); setSubmittedData(null); }} />}
       </div>
     </div>
   )
@@ -437,36 +758,95 @@ function UserVerificationStep({ onVerificationComplete, registrationData }: any)
   const [otpSent, setOtpSent] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
 
-  const isPhoneVerification = !!registrationData.phone
-  const contactInfo = isPhoneVerification ? registrationData.phone : registrationData.email
+  const isPhoneVerification = registrationData.verificationType === "phone"
+  const contactInfo = registrationData.contactValue
   const ContactIcon = isPhoneVerification ? Phone : Mail
   const verificationMethod = isPhoneVerification ? "Phone Number" : "Email Address"
-  const expectedOtp = isPhoneVerification ? "123456" : "654321"
+  
 
-  const handleSendOtp = () => {
-    setOtpSent(true)
-    setResendCooldown(60)
-    toast.success(`OTP sent to ${contactInfo}`)
-
-    const interval = setInterval(() => {
-      setResendCooldown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-  }
-
-  const handleVerifyOtp = () => {
-    if (otp === expectedOtp) {
-      setVerified(true)
-      toast.success(`${verificationMethod} verified successfully!`)
-    } else {
-      toast.error("Invalid OTP. Please try again.")
+  const handleSendOtp = async () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    
+    console.log("registerationData-------------->", registrationData);
+    if (!registrationData?.application_id) {
+      toast.error("User ID not found. Cannot send OTP.");
+      return;
     }
-  }
+
+    const payload = {
+      user_id: registrationData.application_id,
+      contact: registrationData.contactValue,
+      contact_type: registrationData.verificationType,
+    };
+
+    try {
+      const response = await fetch(`${apiUrl}/accounts/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        setOtpSent(true);
+        setResendCooldown(60);
+        toast.success(`OTP sent to ${contactInfo}`);
+
+        const interval = setInterval(() => {
+          setResendCooldown((prev) => {
+            if (prev <= 1) {
+              clearInterval(interval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        const errorData = await response.json();
+        toast.error(`Failed to send OTP: ${errorData.detail || 'An unknown error occurred'}`);
+      }
+    } catch (error) {
+      toast.error('An error occurred while sending the OTP.');
+      console.error('Send OTP error:', error);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    if (!registrationData?.application_id) {
+      toast.error("User ID not found. Cannot verify OTP.");
+      return;
+    }
+
+    const payload = {
+      user_id: registrationData.application_id,
+      otp: otp,
+    };
+
+    try {
+      const response = await fetch(`${apiUrl}/accounts/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok) {
+        setVerified(true);
+        toast.success(`${verificationMethod} verified successfully!`);
+      } else {
+        toast.error(`OTP verification failed: ${responseData?.detail || JSON.stringify(responseData)}`);
+      }
+    } catch (error) {
+      toast.error('An error occurred while verifying the OTP.');
+      console.error('Verify OTP error:', error);
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -482,6 +862,31 @@ function UserVerificationStep({ onVerificationComplete, registrationData }: any)
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {verified && (
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-800 mb-3">Application Summary</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Name:</span>
+                    <span className="font-medium">
+                      {registrationData.first_name_en} {registrationData.last_name_en}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Contact:</span>
+                    <span className="font-medium">{registrationData.contactValue}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Contact Type:</span>
+                    <span className="font-medium capitalize">{registrationData.verificationType}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Application ID:</span>
+                    <span className="font-mono font-medium">{registrationData.application_id}</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="text-center">
               <div
                 className={`w-16 h-16 ${isPhoneVerification ? "bg-blue-100" : "bg-green-100"} rounded-full flex items-center justify-center mx-auto mb-4`}
@@ -489,9 +894,11 @@ function UserVerificationStep({ onVerificationComplete, registrationData }: any)
                 <ContactIcon className={`h-8 w-8 ${isPhoneVerification ? "text-blue-600" : "text-green-600"}`} />
               </div>
               <h3 className="text-lg font-semibold text-gray-800 mb-2">Verify {verificationMethod}</h3>
-              <p className="text-gray-600 mb-4">
-                We'll send a 6-digit OTP to <strong>{contactInfo}</strong>
-              </p>
+              {!verified && (
+                <p className="text-gray-600 mb-4">
+                  We'll send a 6-digit OTP to <strong>{contactInfo}</strong>
+                </p>
+              )}
             </div>
 
             {!otpSent ? (
@@ -501,24 +908,27 @@ function UserVerificationStep({ onVerificationComplete, registrationData }: any)
               </Button>
             ) : (
               <div className="space-y-4">
-                <div>
-                  <Label htmlFor="otp">Enter OTP</Label>
-                  <Input
-                    id="otp"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder="Enter 6-digit OTP"
-                    maxLength={6}
-                    className="text-center text-lg tracking-widest font-mono"
-                    disabled={verified}
-                  />
-                  <p className="text-sm text-gray-500 mt-1 text-center">Demo OTP: {expectedOtp}</p>
-                </div>
+                {!verified && (
+                  <div>
+                    <Label htmlFor="otp">Enter OTP</Label>
+                    <Input
+                      id="otp"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      placeholder="Enter 6-digit OTP"
+                      maxLength={6}
+                      className="text-center text-lg tracking-widest font-mono"
+                      disabled={verified}
+                    />
+                  </div>
+                )}
 
                 <div className="flex gap-2">
-                  <Button onClick={handleSendOtp} variant="outline" disabled={resendCooldown > 0} className="flex-1">
-                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend OTP"}
-                  </Button>
+                  {!verified && (
+                    <Button onClick={handleSendOtp} variant="outline" disabled={resendCooldown > 0} className="flex-1">
+                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend OTP"}
+                    </Button>
+                  )}
                   <Button
                     onClick={handleVerifyOtp}
                     disabled={otp.length !== 6 || verified}
@@ -531,6 +941,15 @@ function UserVerificationStep({ onVerificationComplete, registrationData }: any)
             )}
 
             <div className="pt-6 border-t">
+              {verified && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <p className="text-green-800 font-medium">{verificationMethod} verified successfully!</p>
+                  </div>
+                  <p className="text-green-700 text-sm mt-1">You can now proceed to the payment step.</p>
+                </div>
+              )}
               <Button
                 onClick={onVerificationComplete}
                 disabled={!verified}
@@ -548,7 +967,7 @@ function UserVerificationStep({ onVerificationComplete, registrationData }: any)
 }
 
 // Payment Step Component
-function UserPaymentStep({ onPaymentSuccess, registrationData }: any) {
+function UserPaymentStep({ onPaymentSuccess, registrationData, verified }: any) {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
       <Card className="max-w-2xl mx-auto">
@@ -561,6 +980,31 @@ function UserPaymentStep({ onPaymentSuccess, registrationData }: any) {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {verified && (
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-800 mb-3">Application Summary</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Name:</span>
+                    <span className="font-medium">
+                      {registrationData.first_name_en} {registrationData.last_name_en}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Contact:</span>
+                    <span className="font-medium">{registrationData.contactValue}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Contact Type:</span>
+                    <span className="font-medium capitalize">{registrationData.verificationType}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Application ID:</span>
+                    <span className="font-mono font-medium">{registrationData.application_id}</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="text-center">
               <p className="text-sm text-gray-600">Amount to Pay</p>
               <p className="text-3xl font-bold text-gray-800">৳500</p>
@@ -575,7 +1019,7 @@ function UserPaymentStep({ onPaymentSuccess, registrationData }: any) {
                 </div>
                 <div className="flex justify-between">
                   <span>Contact:</span>
-                  <span>{registrationData.phone || registrationData.email}</span>
+                  <span>{registrationData.contactValue}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Service Code:</span>
@@ -596,7 +1040,7 @@ function UserPaymentStep({ onPaymentSuccess, registrationData }: any) {
 }
 
 // Success Step Component
-function UserSuccessStep({ registrationData }: any) {
+function UserSuccessStep({ registrationData, onRegisterAnotherUser }: any) {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [id, setId] = useState("")
@@ -617,7 +1061,7 @@ function UserSuccessStep({ registrationData }: any) {
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Registration Successful!</h2>
           <p className="text-gray-600 mb-6">
             The user has been registered successfully. Login credentials have been sent via{" "}
-            {registrationData.phone ? "SMS" : "email"}.
+            {registrationData.verificationType === "phone" ? "SMS" : "email"}.
           </p>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
@@ -633,7 +1077,7 @@ function UserSuccessStep({ registrationData }: any) {
                 <strong>ID:</strong> {id}
               </p>
               <p>
-                <strong>Sent to:</strong> {registrationData.phone || registrationData.email}
+                <strong>Sent to:</strong> {registrationData.contactValue}
               </p>
             </div>
           </div>
@@ -644,7 +1088,7 @@ function UserSuccessStep({ registrationData }: any) {
                 Back to Dashboard
               </Button>
             </Link>
-            <Button className="flex-1 bg-blue-600 hover:bg-blue-700">Register Another User</Button>
+            <Button onClick={onRegisterAnotherUser} className="flex-1 bg-blue-600 hover:bg-blue-700">Register Another User</Button>
           </div>
         </CardContent>
       </Card>
