@@ -1,6 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { getCurrentBrowserFingerPrint } from "@rajesh896/broprint.js"
+import { useDispatch, useSelector } from "react-redux"
+import { setLogout, selectAuth } from "@/lib/redux/authSlice";
+import { resetSignup } from "@/lib/redux/signupSlice";
+import { getCookie } from "@/lib/utils/csrf";
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +19,74 @@ import { RegisteredUsersTable } from "@/components/registered-users-table"
 
 export default function CollectorDashboard() {
   const [showSubAccountModal, setShowSubAccountModal] = useState(false)
+  const router = useRouter()
+  const dispatch = useDispatch()
+  const authData = useSelector(selectAuth)
+  const [visitorId, setVisitorId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!authData.isInitializing) {
+      if (!authData.isAuthenticated) {
+        router.push("/login");
+      } else if (authData.userRole === "collector" && !authData.phoneVerified && !authData.emailVerified) {
+        // If authenticated as collector but neither phone nor email is verified, redirect to verification
+        router.push("/signup/collector/verify");
+      }
+    }
+  }, [authData.isAuthenticated, authData.isInitializing, authData.userRole, authData.phoneVerified, authData.emailVerified]);
+
+  useEffect(() => {
+    const getFingerprint = async () => {
+      const fp = await getCurrentBrowserFingerPrint();
+      setVisitorId(fp);
+    };
+    getFingerprint();
+  }, []);
+
+const handleLogout = async () => {
+  console.log("Logout button clicked.");
+
+  const clearStateAndRedirect = () => {
+    dispatch(setLogout());
+    dispatch(resetSignup());
+    localStorage.removeItem('authState');
+    localStorage.removeItem('signupState');
+    router.push("/login");
+  };
+
+  if (!visitorId) {
+    toast.error("Visitor ID not generated. Please try again.");
+    return;
+  }
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  try {
+    const response = await fetch(`${apiUrl}/auth/logout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Visitor-ID": visitorId,
+        "X-CSRFToken": getCookie("csrftoken") || "",
+      },
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      toast.error(result.message || "Logout failed.");
+    } else {
+      const result = await response.json();
+      toast.success(result.message || "Logged out successfully!");
+    }
+  } catch (error) {
+    console.error("Logout Error:", error);
+    toast.error("An unexpected error occurred during logout.");
+  } finally {
+    clearStateAndRedirect();
+  }
+};
+
 
   const stats = [
     {
@@ -51,12 +126,10 @@ export default function CollectorDashboard() {
               <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                 Collector ID: DC-001
               </Badge>
-              <Link href="/login">
-                <Button variant="outline" size="sm">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </Button>
-              </Link>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>

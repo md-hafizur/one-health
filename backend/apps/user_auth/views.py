@@ -11,6 +11,8 @@ from apps.user_auth.models import Session
 
 from .serializers import LoginSerializer
 from ..accounts.serializers import UserSerializer
+from rest_framework.permissions import IsAuthenticated
+from core.authentication.auth import JWTAuthentication
 
 
 class login(APIView):
@@ -21,6 +23,8 @@ class login(APIView):
             user = User.objects.filter(
                 Q(phone=contact) | Q(email=contact)
             ).first()
+
+            contact_type = "phone" if serializer.validated_data.get("phone") else "email"
             if not user:
                 return Response(
                     {"errors": {"user": ["User not found"]}},
@@ -31,12 +35,23 @@ class login(APIView):
                     {"errors": {"password": ["Invalid credentials"]}},
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
-            visitor_id = request.COOKIES.get("visitorId") or request.headers.get(
-                "visitorId"
+            
+            verification_map = {
+                "phone": "phone_verified",
+                "email": "email_verified",
+            }
+            
+            # if not getattr(user, verification_map[contact_type]):
+            #     return Response(
+            #         {"errors": {contact_type: [f"{contact_type.capitalize()} not verified"]}},
+            #         status=status.HTTP_401_UNAUTHORIZED,
+            #     )
+            visitor_id = request.COOKIES.get("X-Visitor-ID") or request.headers.get(
+                "X-Visitor-ID"
             )
             if not visitor_id:
                 return Response(
-                    {"errors": {"visitorId": ["Visitor ID is required."]}},
+                    {"errors": {"X-Visitor-ID": ["Visitor ID is required."]}},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -64,7 +79,7 @@ class login(APIView):
                 session.access_token,
                 path="/",
                 max_age=5 * 60,
-                httponly=False,
+                httponly=True,
                 samesite="None",
                 secure=True,
             )
@@ -73,7 +88,7 @@ class login(APIView):
                 session.refresh_token,
                 path="/",
                 max_age=60 * 68 * 24,
-                httponly=False,
+                httponly=True,
                 samesite="None",
                 secure=True,
             )
@@ -89,8 +104,8 @@ class verify(APIView):
         refresh_token = request.COOKIES.get("refresh-token") or request.headers.get(
             "refresh-token"
         )
-        visitor_id = request.COOKIES.get("visitorId") or request.headers.get(
-            "visitorId"
+        visitor_id = request.COOKIES.get("X-Visitor-ID") or request.headers.get(
+            "X-Visitor-ID"
         )
     
         if not refresh_token:
@@ -134,9 +149,9 @@ class verify(APIView):
                     session.access_token,
                     path="/",
                     max_age=5,
-                    httponly=False,
+                    httponly=True,
                     samesite="None",
-                    secure=True,
+                    secure=False,
                 )
                 return response
             if (
@@ -157,9 +172,9 @@ class verify(APIView):
                     session.access_token,
                     path="/",
                     max_age=5 ,
-                    httponly=False,
+                    httponly=True,
                     samesite="None",
-                    secure=True,
+                    secure=False,
                 )
                 return response
 
@@ -188,15 +203,17 @@ class verify(APIView):
             session.access_token,
             path="/",
             max_age=5,
-            httponly=False,
+            httponly=True,
             samesite="None",
-            secure=True,
+            secure=False,
         )
         return response
 
 
 class logout(APIView):
-    def get(self, request):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
 
         print("request.user.is_authenticated",request.user.is_authenticated)
         if not request.user.is_authenticated:
@@ -212,4 +229,13 @@ class logout(APIView):
         )
         response.delete_cookie("access-token")
         response.delete_cookie("refresh-token")
+        response.delete_cookie("X-Visitor-ID")
         return response
+
+class UserDetail(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        user = request.user
+        serializer = UserSerializer(user, context={"request": request})
+        return Response(serializer.data)

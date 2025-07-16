@@ -1,6 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useSelector } from "react-redux"
+import { selectAuth } from "@/lib/redux/authSlice"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +22,14 @@ export default function AdminDashboard() {
   const [roleFilter, setRoleFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [viewMode, setViewMode] = useState<"table" | "relationships">("table")
+  const router = useRouter()
+  const authData = useSelector(selectAuth)
+
+  useEffect(() => {
+    if (!authData.isAuthenticated || authData.userRole !== "admin") {
+      router.push("/login");
+    }
+  }, [authData.isAuthenticated, authData.userRole]);
 
   const stats = [
     {

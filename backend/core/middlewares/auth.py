@@ -22,8 +22,8 @@ class JwtTokenMiddleware(object):
         refresh_token = request.COOKIES.get("refresh-token") or request.headers.get(
             "Refresh-Token"
         )
-        visitor_id = request.COOKIES.get("visitorId") or request.headers.get(
-            "visitorId"
+        visitor_id = request.COOKIES.get("X-Visitor-ID") or request.headers.get(
+            "X-Visitor-ID"
         )
 
         if access_token:
@@ -61,7 +61,7 @@ class JwtTokenMiddleware(object):
         else:
             request.session = None
             request.user = AnonymousUser()
-
+        print("request.user------->", request.user)
         return request
 
     def __call__(self, request):

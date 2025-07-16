@@ -1,42 +1,49 @@
 # apps/address/serializers.py
 
 from rest_framework import serializers
-from .models import Division, Zilla, Upazila, Union, Village, Para
+from .models import Division, Zilla, Upazila, Union, Village, Para, PostOffice, Address
+from apps.accounts.models import UserProfile, User
 
 class DivisionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Division
-        fields = ['id', 'name']
+        fields = ['id', 'name_bn', 'name_en']
 
 class ZillaSerializer(serializers.ModelSerializer):
-    division = DivisionSerializer(read_only=True)
     class Meta:
         model = Zilla
-        fields = ['id', 'name', 'division']
+        fields = ['id', 'name_bn', 'name_en', 'division']
 
 class UpazilaSerializer(serializers.ModelSerializer):
-    zilla = ZillaSerializer(read_only=True)
     class Meta:
         model = Upazila
-        fields = ['id', 'name', 'zilla']
+        fields = ['id', 'name_bn', 'name_en', 'zilla']
 
 class UnionSerializer(serializers.ModelSerializer):
-    upazila = UpazilaSerializer(read_only=True)
     class Meta:
         model = Union
-        fields = ['id', 'name', 'upazila']
+        fields = ['id', 'name_bn', 'name_en', 'upazila']
 
 class VillageSerializer(serializers.ModelSerializer):
-    union = UnionSerializer(read_only=True)
     class Meta:
         model = Village
-        fields = ['id', 'name', 'union']
+        fields = ['id', 'name_bn', 'name_en', 'union']
 
 class ParaSerializer(serializers.ModelSerializer):
-    village = VillageSerializer(read_only=True)
     class Meta:
         model = Para
-        fields = ['id', 'name', 'village']
+        fields = ['id', 'name_bn', 'name_en', 'village']
+
+class PostOfficeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PostOffice
+        fields = ['id', 'name', 'postal_code', 'union']
+
+
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = '__all__'
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -45,38 +52,53 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['username', 'phone', 'role']
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    address = ParaSerializer(read_only=True)
-    address_id = serializers.PrimaryKeyRelatedField(
-        queryset=Para.objects.all(),
-        source='address',
-        write_only=True
-    )
-    full_address_string = serializers.SerializerMethodField()
+    address = AddressSerializer()
 
     class Meta:
         model = UserProfile
         fields = [
-            'id', 'user', 'address', 'address_id', 'full_address_string'
+            'id', 'user',
+            'name_en', 'name_bn',
+            'phone', 'gurdian_phone',
+            'nid', 'gurdian_nid',
+            'father_name_en', 'father_name_bn',
+            'mother_name_en', 'mother_name_bn',
+            'spouse_name_en', 'spouse_name_bn',
+            'occupation', 'blood_group',
+            'data_of_birth', 'email',
+            'address', 'photo', 'signature'
         ]
 
-    def get_full_address_string(self, obj):
-        if not obj.address:
-            return ""
-        para = obj.address
-        village = para.village if para else None
-        union = village.union if village else None
-        upazila = union.upazila if union else None
-        zilla = upazila.zilla if upazila else None
-        division = zilla.division if zilla else None
+    def validate(self, data):
+        phone = data.get('phone')
+        email = data.get('email')
 
-        parts = [
-            para.name if para else '',
-            village.name if village else '',
-            union.name if union else '',
-            upazila.name if upazila else '',
-            zilla.name if zilla else '',
-            division.name if division else '',
-        ]
-        return ', '.join(filter(None, parts))
+        if not phone and not email:
+            raise ValidationError("Either phone or email must be provided.")
 
+        return data
+
+    def create(self, validated_data):
+        address_data = validated_data.pop('address')
+        address = Address.objects.create(**address_data)
+        profile = UserProfile.objects.create(address=address, **validated_data)
+        return profile
+
+    def update(self, instance, validated_data):
+        address_data = validated_data.pop('address', None)
+
+        if address_data:
+            address = instance.address
+            if address:
+                for attr, value in address_data.items():
+                    setattr(address, attr, value)
+                address.save()
+            else:
+                address = Address.objects.create(**address_data)
+                instance.address = address
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance
