@@ -30,7 +30,6 @@ class RegisterUserView(APIView):
     """
     authentication_classes = [JWTAuthentication]
     permission_classes = [AllowAny]  # Allow public access for registration
-    parser_classes = [MultiPartParser, FormParser]
     
     def __init__(self):
         super().__init__()
@@ -47,6 +46,14 @@ class RegisterUserView(APIView):
         
         # Cache role objects to avoid repeated DB queries
         self._role_cache = {}
+
+
+    def get_parser_classes(self):
+        account_type = self.request.query_params.get("for_account")
+        if account_type == "public":
+            return [MultiPartParser, FormParser, JSONParser]
+        return [JSONParser]
+
     
     @lru_cache(maxsize=32)
     def _get_role_cached(self, role_name: str):
@@ -145,6 +152,7 @@ class RegisterUserView(APIView):
         
         if not user_data['username'] or user_data['username'] == '-':
             raise ValueError("Insufficient data to generate username")
+
         
         return user_data
     
@@ -204,7 +212,7 @@ class RegisterUserView(APIView):
         user = serializer.save()
         
         #! Send welcome message, verify contact, and pay fee for complete registration in background thread (non-blocking)
-        self._send_complete_registration_message_async(user, contact_type, contact)
+        # self._send_complete_registration_message_async(user, contact_type, contact)
         
         respose_data = {
             "user_id": user.id,
@@ -274,7 +282,7 @@ class RegisterUserView(APIView):
         contact = user_data['user_data'].get(contact_type)
 
         # Step 4: Background tasks (non-blocking)
-        # self._send_complete_registration_message_async(user, contact_type, contact)
+        self._send_complete_registration_message_async(user, contact_type, contact)
 
         # Step 5: Return response
         response_data = {
