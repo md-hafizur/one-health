@@ -14,10 +14,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 export default function RegisterPage() {
-  const [step, setStep] = useState(1) // 1: Form, 2: Verification, 3: Payment, 4: Success
-  const [submittedData, setSubmittedData] = useState<any>(null);
-  const [isVerified, setIsVerified] = useState(false);
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     first_name_en: '',
     last_name_en: '',
     name_bn: '',
@@ -43,7 +40,12 @@ export default function RegisterPage() {
     serviceCode: '',
     photo: null as File | null,
     signature: null as File | null,
-  })
+  };
+
+  const [step, setStep] = useState(1) // 1: Form, 2: Verification, 3: Payment, 4: Success
+  const [submittedData, setSubmittedData] = useState<any>(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [formData, setFormData] = useState(initialFormData);
 
   useEffect(() => {
     // Generate serviceCode only on the client side
@@ -745,7 +747,7 @@ const lastName = last_name_en;
         {step === 3 && submittedData && <UserPaymentStep onPaymentSuccess={handlePaymentSuccess} registrationData={submittedData} />}
 
         {/* Step 4: Success */}
-        {step === 4 && submittedData && <UserSuccessStep registrationData={submittedData} onRegisterAnotherUser={() => { setStep(1); setSubmittedData(null); }} />}
+        {step === 4 && submittedData && <UserSuccessStep registrationData={submittedData} onRegisterAnotherUser={() => { setStep(1); setSubmittedData(null); setFormData(initialFormData); }} />}
       </div>
     </div>
   )
