@@ -14,7 +14,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Users, UserPlus, CreditCard, Plus, LogOut, UserCheck } from "lucide-react"
 import Link from "next/link"
-import { CreateSubAccountModal } from "@/components/enhanced-sub-account-modal"
 import { RegisteredUsersTable } from "@/components/registered-users-table"
 
 export default function CollectorDashboard() {
@@ -23,6 +22,12 @@ export default function CollectorDashboard() {
   const dispatch = useDispatch()
   const authData = useSelector(selectAuth)
   const [visitorId, setVisitorId] = useState<string | null>(null)
+  const [recentUsers, setRecentUsers] = useState<any[]>([])
+  const [loadingRecent, setLoadingRecent] = useState(true)
+  const [errorRecent, setErrorRecent] = useState<string | null>(null)
+  const [statsData, setStatsData] = useState<any>({})
+  const [loadingStats, setLoadingStats] = useState(true)
+  const [errorStats, setErrorStats] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authData.isInitializing) {
@@ -41,6 +46,70 @@ export default function CollectorDashboard() {
       setVisitorId(fp);
     };
     getFingerprint();
+
+    const fetchRecentUsers = async () => {
+      setLoadingRecent(true)
+      setErrorRecent(null)
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL
+        const csrfToken = getCookie("csrftoken")
+        const response = await fetch(`${apiUrl}/accounts/last-user-details`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken || "",
+          },
+          credentials: "include",
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
+        }
+
+        const data = await response.json()
+        setRecentUsers(data)
+      } catch (e: any) {
+        setErrorRecent(e.message)
+        toast.error(`Failed to fetch recent users: ${e.message}`)
+      } finally {
+        setLoadingRecent(false)
+      }
+    }
+
+    fetchRecentUsers()
+
+    const fetchStats = async () => {
+      setLoadingStats(true)
+      setErrorStats(null)
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL
+        const csrfToken = getCookie("csrftoken")
+        const response = await fetch(`${apiUrl}/accounts/user-statistics`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken || "",
+          },
+          credentials: "include",
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
+        }
+
+        const data = await response.json()
+        setStatsData(data)
+      } catch (e: any) {
+        setErrorStats(e.message)
+        toast.error(`Failed to fetch stats: ${e.message}`)
+      } finally {
+        setLoadingStats(false)
+      }
+    }
+
+    fetchStats()
   }, []);
 
 const handleLogout = async () => {
@@ -91,22 +160,22 @@ const handleLogout = async () => {
   const stats = [
     {
       title: "Total Registered",
-      value: "1,247",
-      change: "+12%",
+      value: loadingStats ? "-" : statsData.total_registered,
+      change: "",
       icon: Users,
       color: "text-blue-600",
     },
     {
       title: "Pending Payments",
-      value: "23",
-      change: "-5%",
+      value: loadingStats ? "-" : statsData.pending_payments,
+      change: "",
       icon: CreditCard,
       color: "text-orange-600",
     },
     {
       title: "Paid Users",
-      value: "1,224",
-      change: "+15%",
+      value: loadingStats ? "-" : statsData.paid_users,
+      change: "",
       icon: UserCheck,
       color: "text-green-600",
     },
@@ -120,11 +189,11 @@ const handleLogout = async () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Data Collector Dashboard</h1>
-              <p className="text-gray-600">Welcome back, John Collector</p>
+              <p className="text-gray-600">Welcome back, {authData.firstName} {authData.lastName}</p>
             </div>
             <div className="flex items-center gap-4">
               <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                Collector ID: DC-001
+                Collector ID: {authData.applicationId}
               </Badge>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
@@ -147,18 +216,22 @@ const handleLogout = async () => {
             >
               <Card className="hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                      <p className="text-3xl font-bold text-gray-800">{stat.value}</p>
-                      <p className={`text-sm ${stat.change.startsWith("+") ? "text-green-600" : "text-red-600"}`}>
-                        {stat.change} from last month
-                      </p>
+                  {loadingStats && <p>Loading...</p>}
+                  {errorStats && <p className="text-red-500">{errorStats}</p>}
+                  {!loadingStats && !errorStats && (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{stat.title}</p>
+                        <p className="text-3xl font-bold text-gray-800">{stat.value}</p>
+                        <p className={`text-sm ${stat.change.startsWith("+") ? "text-green-600" : "text-red-600"}`}>
+                          {stat.change}
+                        </p>
+                      </div>
+                      <div className={`p-3 rounded-full bg-gray-100 ${stat.color}`}>
+                        <stat.icon className="h-6 w-6" />
+                      </div>
                     </div>
-                    <div className={`p-3 rounded-full bg-gray-100 ${stat.color}`}>
-                      <stat.icon className="h-6 w-6" />
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -188,9 +261,10 @@ const handleLogout = async () => {
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
+            <Link href="/subAccount">
             <Card
               className="h-full hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => setShowSubAccountModal(true)}
+              // onClick={() => setShowSubAccountModal(true)}
             >
               <CardHeader className="text-center pb-4">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -206,6 +280,7 @@ const handleLogout = async () => {
                 </Button>
               </CardContent>
             </Card>
+            </Link>
           </motion.div>
         </div>
 
@@ -232,38 +307,47 @@ const handleLogout = async () => {
               <CardDescription>Latest user registrations and their status</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {[
-                  { name: "Sarah Ahmed", id: "OH-2024-1247", status: "Paid", time: "2 hours ago" },
-                  { name: "Mohammad Rahman", id: "OH-2024-1246", status: "Pending", time: "4 hours ago" },
-                  { name: "Fatima Khan", id: "OH-2024-1245", status: "Paid", time: "6 hours ago" },
-                ].map((user, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-800">{user.name}</p>
-                      <p className="text-sm text-gray-600">{user.id}</p>
+              {loadingRecent && <p>Loading...</p>}
+              {errorRecent && <p className="text-red-500">{errorRecent}</p>}
+              {!loadingRecent && !errorRecent && recentUsers.length === 0 && <p>No recent registrations found.</p>}
+              {!loadingRecent && !errorRecent && recentUsers.length > 0 && (
+                <div className="space-y-4">
+                  {recentUsers.map((user, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-gray-800">{user.first_name} {user.last_name}</p>
+                        <p className="text-sm text-gray-600">{user.service_code}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge
+                          variant={user.email_verified || user.phone_verified ? "default" : "destructive"}
+                          className={
+                            user.email_verified || user.phone_verified
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-red-100 text-red-800"
+                          }
+                        >
+                          {user.email_verified || user.phone_verified ? "Verified" : "Unverified"}
+                        </Badge>
+                        <Badge
+                          variant={user.payment_status === "Paid" ? "default" : "secondary"}
+                          className={
+                            user.payment_status === "Paid"
+                              ? "bg-green-100 text-green-800 ml-2"
+                              : "bg-yellow-100 text-yellow-800 ml-2"
+                          }
+                        >
+                          {user.payment_status}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <Badge
-                        variant={user.status === "Paid" ? "default" : "secondary"}
-                        className={
-                          user.status === "Paid" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                        }
-                      >
-                        {user.status}
-                      </Badge>
-                      <p className="text-sm text-gray-500 mt-1">{user.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
       </div>
-
-      {/* Modals */}
-      <CreateSubAccountModal open={showSubAccountModal} onOpenChange={setShowSubAccountModal} />
     </div>
   )
 }
