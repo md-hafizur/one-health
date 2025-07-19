@@ -8,4 +8,7 @@ urlpatterns = [
 
     # user
     path('user-details', views.UserDetailView.as_view(), name='user'),
+    path('last-user-details', views.UserLastDetail.as_view(), name='last-user'),
+    path("user-statistics", views.UserStatisticsView.as_view(), name="user-statistics"),
+    path("public-user", views.publicUserView.as_view(), name="public-user"),
 ]

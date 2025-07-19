@@ -1,6 +1,7 @@
 # apps/address/serializers.py
 
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from .models import Division, Zilla, Upazila, Union, Village, Para, PostOffice, Address
 from apps.accounts.models import UserProfile, User
 
@@ -52,7 +53,8 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['username', 'phone', 'role']
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    address = AddressSerializer()
+    address = AddressSerializer(required=False, allow_null=True)
+    account_type = serializers.CharField(required=False, allow_null=True)
 
     class Meta:
         model = UserProfile
@@ -66,22 +68,28 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'spouse_name_en', 'spouse_name_bn',
             'occupation', 'blood_group',
             'data_of_birth', 'email',
-            'address', 'photo', 'signature'
+            'address', 'photo', 'signature', 'account_type'
         ]
 
     def validate(self, data):
         phone = data.get('phone')
         email = data.get('email')
+        account_type = data.get('account_type') 
 
-        if not phone and not email:
-            raise ValidationError("Either phone or email must be provided.")
+        if account_type != "sub-account":
+            if not phone and not email:
+                raise ValidationError("Either phone or email must be provided.")
 
         return data
 
     def create(self, validated_data):
-        address_data = validated_data.pop('address')
-        address = Address.objects.create(**address_data)
-        profile = UserProfile.objects.create(address=address, **validated_data)
+        address_data = validated_data.pop('address', None)
+        account_type = validated_data.pop('account_type')
+        if account_type !='sub-account':
+            address = Address.objects.create(**address_data)
+            profile = UserProfile.objects.create(address=address, **validated_data)
+        else:
+            profile = UserProfile.objects.create(**validated_data)
         return profile
 
     def update(self, instance, validated_data):

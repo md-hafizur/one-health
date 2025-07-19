@@ -61,7 +61,17 @@ class User(AbstractUser, BaseModel):
     phone_code = models.CharField(max_length=6, null=True, blank=True)
 
     payment_status = models.CharField(max_length=10, choices=[('Paid', 'Paid'), ('Pending', 'Pending'), ('Failed', 'Failed')], default='Pending')
-    
+
+    sub_account_status = models.CharField(
+        max_length=10,
+        choices=[
+            ('Draft', 'Draft'),
+            ('Active', 'Active'),
+            ('Inactive', 'Inactive')
+        ],
+        blank=True,
+        null=True
+    )
 
     class Meta:
         constraints = [
@@ -96,6 +106,9 @@ class UserProfile(models.Model):
         blank=True,
     )
     gurdian_phone = models.CharField(max_length=11, validators=[phone_validator], blank=True, null=True)
+    gurdian_email = models.EmailField(blank=True, null=True)
+    # relationship chicoe like son, daughter, etc
+    relationship = models.CharField(max_length=100, choices=[('Son', 'Son'), ('Daughter', 'Daughter'), ('Brother', 'Brother'), ('Sister', 'Sister'), ('Other', 'Other')], blank=True, null=True)
 
     nid = models.CharField(max_length=17, blank=True, null=True)
     gurdian_nid = models.CharField(max_length=17, blank=True, null=True)
@@ -112,7 +125,7 @@ class UserProfile(models.Model):
 
     occupation = models.CharField(max_length=100, blank=True, null=True)
 
-    blood_group = models.CharField(max_length=3, blank=True, null=True)
+    blood_group = models.CharField(max_length=3, choices=[('A+', 'A+'), ('A-', 'A-'), ('B+', 'B+'), ('B-', 'B-'), ('AB+', 'AB+'), ('AB-', 'AB-'), ('O+', 'O+'), ('O-', 'O-')], blank=True, null=True)
     data_of_birth = models.DateField(blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
 

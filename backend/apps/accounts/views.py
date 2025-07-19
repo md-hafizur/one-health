@@ -1,11 +1,14 @@
+import re
 from .models import Role, User
 from apps.address.models import Address
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from django.db.models import ExpressionWrapper, Q, BooleanField,Count, OuterRef, Subquery, IntegerField, Exists
 from .serializers import UserSerializer, VerifyOTPSerializer, SendVerificationSerializer
 from apps.address.serializers import AddressSerializer, UserProfileSerializer
 from core.authentication.auth import JWTAuthentication
+from core.pagination.user_pagination import UserPagination
 from rest_framework.permissions import IsAuthenticated
 from core.utils.emailer import EmailSender
 from rest_framework.permissions import AllowAny
@@ -50,7 +53,7 @@ class RegisterUserView(APIView):
 
     def get_parser_classes(self):
         account_type = self.request.query_params.get("for_account")
-        if account_type == "public":
+        if account_type in  ["public", "sub_account"]:
             return [MultiPartParser, FormParser, JSONParser]
         return [JSONParser]
 
@@ -91,7 +94,7 @@ class RegisterUserView(APIView):
                 case 'public':
                     return self._public_user_registration(request,user_data)
                 case 'sub_account':
-                    ...
+                    return self._sub_account_registration(request,user_data)
             
         except Exception as e:
             logger.error(f"Registration error: {str(e)}")
@@ -102,7 +105,7 @@ class RegisterUserView(APIView):
 
         account_for = request.GET.get('for_account')
 
-        if account_for == 'public':
+        if account_for in ['public','sub_account']:
 
             """Prepare and attach user_data and user_profile including uploaded files"""
 
@@ -123,14 +126,9 @@ class RegisterUserView(APIView):
                 user_profile_json['signature'] = signature
 
             # Step 4: Determine contact info (for username fallback)
-            phone = user_data_json.get('phone') or user_profile_json.get('phone')
-            email = user_data_json.get('email') or user_profile_json.get('email')
-            username = phone or email
+            phone = user_data_json.get('phone') or user_profile_json.get('phone') or None
+            email = user_data_json.get('email') or user_profile_json.get('email') or None
 
-            if not username or username == '-':
-                raise ValueError("Insufficient data to generate username")
-
-            user_data_json['username'] = username
             user_data_json['password'] = generate_verification_code()
             user_data_json['confirm_password'] = user_data_json['password']
 
@@ -172,21 +170,24 @@ class RegisterUserView(APIView):
     
     def _setup_sub_account(self, user_data: Dict[str, Any], request) -> Dict[str, Any]:
         """Setup sub account with optimized validation"""
-        parent_id = user_data.get('parent')
+
+        
+        parent_id = user_data.get('user_data',{}).get('parent')
         if not parent_id:
             raise ValueError("Parent ID is required for sub-account")
         
         # Optimized parent validation (cache if needed)
         parent_user = get_object_or_404(User, pk=parent_id)
         
-        # Optimize username generation
-        contact = user_data.get('phone') or user_data.get('email')
+        # Parent user contact type 
+        contact = parent_user.phone or parent_user.email
         if contact:
-            user_data['username'] = f"sub_{contact}"
+            username = f"sub_{contact}"
         
-        user_data.update({
+        user_data['user_data'].update({
             'parent': parent_user.id,
-            'role': self._get_role_cached('public').id
+            'role': self._get_role_cached('public').id,
+            'username' : username
         })
         return user_data
 
@@ -242,15 +243,11 @@ class RegisterUserView(APIView):
 
         # Extract files from request.FILES
 
-        print("request user", request.user)
-
         public_user_data = {
             "role": public_role.id,
             "addBy": request.user.id if request.user and request.user.is_authenticated else None,
             **user_data.get('user_data', {})
         }
-
-        print("public_user_data(((())))", public_user_data)
 
         # Step 1: Create user
         user_serializer = UserSerializer(data=public_user_data)
@@ -297,6 +294,70 @@ class RegisterUserView(APIView):
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 
+    @transaction.atomic
+    def _sub_account_registration(self, request, user_data: Dict[str, Any]):
+        """Atomic sub user registration: all-or-nothing"""
+        sub_role = self._get_role_cached('subUser')
+
+        # Extract files from request.FILES
+
+        sub_user_data = {
+            "role": sub_role.id,
+            "addBy": request.user.id if request.user and request.user.is_authenticated else None,
+            "account_type": "sub-account",
+            "guardian_nid": user_data.get('user_profile', {}).get('guardian_nid'),
+            **user_data.get('user_data', {})
+        }
+
+        # print("sub user data:", sub_user_data)
+
+        # Step 1: Create user
+        user_serializer = UserSerializer(data=sub_user_data)
+        if not user_serializer.is_valid():
+            return Response(
+                {"errors": user_serializer.errors, "context": "user creation failed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        user = user_serializer.save()
+
+        # Step 2: Create user profile
+        user_profile_data = {
+            "user": user.id,
+            "account_type": "sub-account",
+            **user_data.get("user_profile", {})
+        }
+        # return Response(user_profile_data, status=status.HTTP_201_CREATED)
+
+        profile_serializer = UserProfileSerializer(data=user_profile_data)
+        if not profile_serializer.is_valid():
+            # Raise rollback explicitly
+            transaction.set_rollback(True)
+            return Response(
+                {"errors": profile_serializer.errors, "context": "user profile creation failed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        user_profile = profile_serializer.save()
+
+        # Step 3: Contact method
+        parent_account = User.objects.filter(userprofile__nid=user_data['user_profile']['guardian_nid']).first()
+        contact_type = 'phone' if parent_account.phone else 'email'
+        contact = parent_account.phone if parent_account.phone else parent_account.email
+
+        # Step 4: Background tasks (non-blocking)
+        # self._send_complete_registration_message_async(user, contact_type, contact)
+
+        # Step 5: Return response
+        response_data = {
+            "user_id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "name": user.get_full_name(),
+            "application_id": user.id,
+            "contact": contact,
+            "contact_type": contact_type
+        }
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
 
     def _send_complete_registration_message_async(self, user, contact_type, contact):
@@ -406,7 +467,7 @@ class SendVerificationView(APIView):
                 logger.error(f"Background email sending failed: {str(e)}")
         
         #! Method 1: Using ThreadPoolExecutor (RECOMMENDED)
-        # self.thread_pool.submit(send_email_task)
+        self.thread_pool.submit(send_email_task)
 
     def __del__(self):
         """Clean up thread pool when view is destroyed"""
@@ -421,8 +482,111 @@ class UserDetailView(APIView):
     def get(self, request):
         user = request.user
 
-        # ✅ Only top-level users added by this user
-        users = User.objects.filter(addBy=user, parent__isnull=True)
+        # Base queryset
+        queryset = User.objects.filter(addBy=user, parent__isnull=True).order_by('-id')
 
-        serializer = UserSerializer(users, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # Filter: payment_status
+        payment_status = request.GET.get('payment_status')
+        if payment_status and payment_status.lower() != 'all':
+            queryset = queryset.filter(payment_status=payment_status)
+
+        # Filter: verification_status
+        verification_status = request.GET.get('verification_status')
+        if verification_status == 'verified':
+            queryset = queryset.filter(Q(email_verified=True) | Q(phone_verified=True))
+        elif verification_status == 'unverified':
+            queryset = queryset.filter(Q(email_verified=False) & Q(phone_verified=False))
+
+        # Annotate verification_status (True/False based on email or phone verified)
+        queryset = queryset.annotate(
+            verification_status=ExpressionWrapper(
+                Q(email_verified=True) | Q(phone_verified=True),
+                output_field=BooleanField()
+            )
+        )
+
+        # Ordering
+        ordering_field = request.query_params.get('ordering', '-id')  # default to newest
+        if ordering_field.lstrip('-') == 'verification_status':
+            queryset = queryset.order_by(ordering_field)  # supports both asc and desc
+        else:
+            # Safe fallback for known fields only (prevent SQL injection-style abuse)
+            allowed_order_fields = ['id', 'first_name', 'last_name', 'email', 'payment_status']
+            field_name = ordering_field.lstrip('-')
+            if field_name in allowed_order_fields:
+                queryset = queryset.order_by(ordering_field)
+
+        # Pagination
+        paginator = UserPagination()
+        paginated_users = paginator.paginate_queryset(queryset, request)
+        serializer = UserSerializer(paginated_users, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
+class UserLastDetail(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        user = request.user
+        qqueryset = User.objects.filter(addBy=user).order_by('-id').values(
+            'email_verified',
+            'phone_verified',
+            'payment_status',
+            'first_name',
+            'last_name'
+        )[:3]
+        return Response(qqueryset, status=status.HTTP_200_OK)
+
+class UserStatisticsView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Filter users added by current user
+        base_queryset = User.objects.filter(addBy=user)
+
+        total_registered = base_queryset.count()
+        paid_users = base_queryset.filter(payment_status="Paid").count()
+        pending_payments = base_queryset.exclude(payment_status="Paid").count()
+
+        return Response({
+            "total_registered": total_registered,
+            "paid_users": paid_users,
+            "pending_payments": pending_payments
+        })
+
+
+class publicUserView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        param = request.GET.get('param')
+
+        # Prepare safe ID filter
+        id_filter = Q()
+        if param and str(param).isdigit():
+            id_filter = Q(id=int(param))
+
+        # Main user query with role filtering and parent check
+        user_qs = User.objects.annotate(
+            child_count=Count('children', distinct=True)
+        ).filter(
+            (
+                Q(phone=param) |
+                Q(email=param) |
+                Q(first_name__icontains=param) |
+                Q(last_name__icontains=param) |
+                id_filter
+            ) &
+            ~Q(role__name__in=['dataCollector', 'admin']) &
+            Q(parent__isnull=True)
+        ).values("id", "first_name", "last_name", "phone", "email", "child_count").first()
+
+        if not user_qs:
+            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(user_qs, status=status.HTTP_200_OK)
