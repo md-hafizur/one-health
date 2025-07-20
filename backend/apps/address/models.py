@@ -1,6 +1,7 @@
 from django.db import models
+from core.utils.modeler import BaseModel
 
-class Division(models.Model):
+class Division(BaseModel):
     name_bn = models.CharField(max_length=100, unique=True)
     name_en = models.CharField(max_length=100, unique=True)
 
@@ -8,7 +9,7 @@ class Division(models.Model):
         return self.name_en
 
 
-class Zilla(models.Model):
+class Zilla(BaseModel):
     name_bn = models.CharField(max_length=100)
     name_en = models.CharField(max_length=100)
     division = models.ForeignKey(Division, on_delete=models.CASCADE, related_name='zillas')
@@ -20,7 +21,7 @@ class Zilla(models.Model):
         return self.name_en
 
 
-class Upazila(models.Model):
+class Upazila(BaseModel):
     name_bn = models.CharField(max_length=100)
     name_en = models.CharField(max_length=100)
     zilla = models.ForeignKey(Zilla, on_delete=models.CASCADE, related_name='upazilas')
@@ -32,7 +33,7 @@ class Upazila(models.Model):
         return self.name_en
 
 
-class Union(models.Model):
+class Union(BaseModel):
     name_bn = models.CharField(max_length=100)
     name_en = models.CharField(max_length=100)
     upazila = models.ForeignKey(Upazila, on_delete=models.CASCADE, related_name='unions')
@@ -43,7 +44,7 @@ class Union(models.Model):
     def __str__(self):
         return self.name_en
 
-class PostOffice(models.Model):
+class PostOffice(BaseModel):
     name = models.CharField(max_length=100)
     postal_code = models.CharField(max_length=10)
     union = models.ForeignKey('Union', on_delete=models.CASCADE, related_name='post_offices')
@@ -55,7 +56,7 @@ class PostOffice(models.Model):
         return f"{self.name} ({self.postal_code})"
 
 
-class Village(models.Model):
+class Village(BaseModel):
     name_bn = models.CharField(max_length=100)
     name_en = models.CharField(max_length=100)
     union = models.ForeignKey("Union", on_delete=models.CASCADE, related_name="villages")
@@ -64,7 +65,7 @@ class Village(models.Model):
         return self.name_en
 
 
-class Para(models.Model):
+class Para(BaseModel):
     name_bn = models.CharField(max_length=100)
     name_en = models.CharField(max_length=100)
     village = models.ForeignKey("Village", on_delete=models.CASCADE, related_name="paras")
@@ -73,7 +74,7 @@ class Para(models.Model):
         return self.name_en
 
 
-class Address(models.Model):
+class Address(BaseModel):
     division = models.ForeignKey(Division, on_delete=models.SET_NULL, null=True)
     zilla = models.ForeignKey(Zilla, on_delete=models.SET_NULL, null=True)
     upazila = models.ForeignKey(Upazila, on_delete=models.SET_NULL, null=True)

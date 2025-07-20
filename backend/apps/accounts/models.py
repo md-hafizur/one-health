@@ -5,7 +5,7 @@ from django.db.models import Q
 from apps.address.models import Address
 from core.validators import phone_validator
 
-class Role(models.Model):
+class Role(BaseModel):
     name = models.CharField(max_length=50, unique=True)
     label = models.CharField(max_length=100) 
 
@@ -91,7 +91,7 @@ class User(AbstractUser, BaseModel):
         return self.username or self.email or self.phone or f"User-{self.pk}"
 
 
-class UserProfile(models.Model):
+class UserProfile(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
 
     # Core profile

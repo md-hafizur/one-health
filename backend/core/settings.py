@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'apps.payment',
     'apps.address',
+    'apps.statistic_table',
     
 ]
 
