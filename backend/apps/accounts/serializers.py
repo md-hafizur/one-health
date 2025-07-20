@@ -217,6 +217,7 @@ class VerifyOTPSerializer(serializers.Serializer):
                     if user.email_code == otp:
                         user.email_code = None
                         user.email_verified = True
+                        user.sub_account_status = "Active"
                         user.save()
                         return self._get_verification_success_data(user, "Email", "Email")
                     else:
@@ -225,6 +226,7 @@ class VerifyOTPSerializer(serializers.Serializer):
                     if user.phone_code == otp:
                         user.phone_code = None
                         user.phone_verified = True
+                        user.sub_account_status = "Active"
                         user.save()
                         return self._get_verification_success_data(user, "Phone Number", "Phone Number")
                     else:
@@ -259,30 +261,25 @@ class SendVerificationSerializer(serializers.Serializer):
     contact = serializers.CharField()
     contact_type = serializers.CharField()
     user_id = serializers.IntegerField()
-    account_type = serializers.CharField()
+    account_type = serializers.CharField(allow_null=True, required=False)
 
     def validate(self, data):
         user_id = data.get("user_id")
         contact = data.get("contact")
         contact_type = data.get("contact_type")
+        account_type = data.get("account_type", None)
 
-        account_type = data.get("account_type")
-        if account_type != "sub-account":
-            try:
+        try:
+            if account_type == "sub-account":
+                user = User.objects.get(id=user_id)
+            else:
                 user = User.objects.get(
                     Q(id=user_id, email=contact) |
                     Q(id=user_id, phone=contact)
                 )
-            except User.DoesNotExist:
-                raise serializers.ValidationError("User not found.")
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found.")
 
-        else:
-            try:
-                user = User.objects.get(id=user_id)
-            except User.DoesNotExist:
-                raise serializers.ValidationError("User not found.")
-                
         data['user'] = user
         data['contact_type'] = contact_type
-
         return data
