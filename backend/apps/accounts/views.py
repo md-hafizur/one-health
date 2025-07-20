@@ -466,7 +466,7 @@ class SendVerificationView(APIView):
             print("serializer.validated_data", serializer.validated_data)
             user = serializer.validated_data['user']
             contact_type = serializer.validated_data['contact_type']
-            account_type = serializer.validated_data['account_type']
+            account_type = serializer.validated_data.get('account_type', None)
             contact = serializer.validated_data['contact']
             # Generate OTP
             otp = generate_verification_code()
@@ -569,6 +569,7 @@ class UserDetailView(APIView):
         paginator = UserPagination()
         paginated_users = paginator.paginate_queryset(queryset, request)
         serializer = UserSerializer(paginated_users, many=True)
+        print("serializer.data", serializer.data)
         return paginator.get_paginated_response(serializer.data)
 
 

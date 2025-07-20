@@ -126,7 +126,9 @@
     justify-content: center;
     align-items: center;
     width: 100%;
-    height: auto;
+    height: 10rem;
+    margin-top: 2rem;
+    margin-bottom: 2rem;
     font-size: 2rem;
 }
 
