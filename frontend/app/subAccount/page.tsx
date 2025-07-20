@@ -23,10 +23,19 @@ interface ParentUser {
   child_count: number
 }
 
+interface SubAccountData {
+  user_id: number;
+  first_name: string;
+  last_name: string;
+  name: string;
+  application_id: string;
+}
+
 export default function SubAccountRegistrationPage() {
   const [step, setStep] = useState(1)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedParent, setSelectedParent] = useState<ParentUser | null>(null)
+  const [subAccountData, setSubAccountData] = useState<SubAccountData | null>(null);
   const [formData, setFormData] = useState({
     first_name_en: '',
     last_name_en: '',
@@ -47,7 +56,7 @@ export default function SubAccountRegistrationPage() {
       setSearchResults([])
       return
     }
-    try {ArrowLeft
+    try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
         const csrfToken =  getCookie("csrftoken")
         const response = await fetch(`${apiUrl}/accounts/public-user?param=${term}`, {
@@ -154,11 +163,7 @@ export default function SubAccountRegistrationPage() {
       const responseData = await response.json();
 
       if (response.ok) {
-        const subAccountData = {
-          ...formData,
-          ...responseData,
-          application_id: responseData.application_id || `SUB-${Date.now()}`,
-        };
+        setSubAccountData(responseData);
         setStep(4);
         toast.success("Sub-account data submitted! Please verify OTP.");
       } else {
@@ -341,11 +346,10 @@ export default function SubAccountRegistrationPage() {
         )}
 
         {/* Step 4: OTP Verification */}
-        {step === 4 && selectedParent && (
+        {step === 4 && selectedParent && subAccountData && (
           <OTPVerificationStep
             selectedParent={selectedParent}
-            formData={formData}
-            setFormData={setFormData}
+            subAccountData={subAccountData}
             onVerificationComplete={handleVerificationComplete}
             setStep={setStep}
           />
@@ -473,7 +477,7 @@ function ConfirmSelectionStep({ selectedParent, setStep, handleNext }: any) {
 
 
 // OTP Verification Step Component
-function OTPVerificationStep({ selectedParent, formData, setFormData, onVerificationComplete, setStep, subAccountApplicationId }: any) {
+function OTPVerificationStep({ selectedParent, subAccountData, onVerificationComplete, setStep }: any) {
   const [otp, setOtp] = useState("")
   const [verified, setVerified] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
@@ -487,22 +491,25 @@ function OTPVerificationStep({ selectedParent, formData, setFormData, onVerifica
   const apiUrl = process.env.NEXT_PUBLIC_API_URL
 
   const handleSendOtp = async () => {
-    if (!selectedParent?.id) {
+    if (!subAccountData?.user_id) {
       toast.error("User ID not found. Cannot send OTP.");
       return;
     }
 
     const payload = {
-      user_id: selectedParent.id,
+      user_id: subAccountData.user_id,
       contact: contactInfo,
       contact_type: isPhoneVerification ? "phone" : "email",
+      account_type: "sub-account",
     };
 
     try {
+      const csrfToken = getCookie("csrftoken");
       const response = await fetch(`${apiUrl}/accounts/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          "X-CSRFToken": csrfToken || "",
         },
         body: JSON.stringify(payload),
       });
@@ -532,21 +539,25 @@ function OTPVerificationStep({ selectedParent, formData, setFormData, onVerifica
   };
 
   const handleVerifyOtp = async () => {
-    if (!selectedParent?.id) {
+    if (!subAccountData?.user_id) {
       toast.error("User ID not found. Cannot verify OTP.");
       return;
     }
 
     const payload = {
-      user_id: selectedParent.id,
+      user_id: subAccountData.user_id,
       otp: otp,
+      account_type: "sub-account",
+      contact_type: selectedParent.phone ? "phone" : "email",
     };
 
     try {
+      const csrfToken = getCookie("csrftoken");
       const response = await fetch(`${apiUrl}/accounts/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          "X-CSRFToken": csrfToken || "",
         },
         body: JSON.stringify(payload),
       });
