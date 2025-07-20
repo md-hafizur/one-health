@@ -21,6 +21,7 @@ from django.db import transaction
 from concurrent.futures import ThreadPoolExecutor
 from rest_framework.parsers import MultiPartParser, FormParser
 import json
+import random, string
 import logging
 
 
@@ -299,6 +300,12 @@ class RegisterUserView(APIView):
         """Atomic sub user registration: all-or-nothing"""
         sub_role = self._get_role_cached('subUser')
 
+        password = self._generate_password()
+        user_data['user_data']['password'] = password
+
+        sub_user_data = user_data.get('user_data', {})
+        profile_data = user_data.get('user_profile', {})
+
         # Extract files from request.FILES
 
         sub_user_data = {
@@ -306,7 +313,8 @@ class RegisterUserView(APIView):
             "addBy": request.user.id if request.user and request.user.is_authenticated else None,
             "account_type": "sub-account",
             "guardian_nid": user_data.get('user_profile', {}).get('guardian_nid'),
-            **user_data.get('user_data', {})
+            "password": password,
+            **sub_user_data
         }
 
         # print("sub user data:", sub_user_data)
@@ -324,7 +332,7 @@ class RegisterUserView(APIView):
         user_profile_data = {
             "user": user.id,
             "account_type": "sub-account",
-            **user_data.get("user_profile", {})
+            **profile_data
         }
         # return Response(user_profile_data, status=status.HTTP_201_CREATED)
 
@@ -344,7 +352,7 @@ class RegisterUserView(APIView):
         contact = parent_account.phone if parent_account.phone else parent_account.email
 
         # Step 4: Background tasks (non-blocking)
-        # self._send_complete_registration_message_async(user, contact_type, contact)
+        # self._send_sub_account_registration_permission_message(user, contact_type, contact,password)
 
         # Step 5: Return response
         response_data = {
@@ -358,6 +366,40 @@ class RegisterUserView(APIView):
         }
 
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+    
+    def _send_sub_account_registration_permission_message(self, user, contact_type, contact,password):
+        def send_content(user, contact_type, contact, password):
+            match contact_type:
+                case 'phone':
+                    ...
+                case 'email':
+                    try:
+                        recipient = contact
+                        
+                        if recipient:
+                            # Send email in background thread
+                            EmailSender()\
+                                .set_subject("Permission for Sub Account Registration")\
+                                .set_message(
+                                    f"A sub-user account has been created and is awaiting your approval. "
+                                    f"To authorize this sub-account, please verify the OTP sent to your {contact_type}. "
+                                    f"Sub-user Username: {user.username}, Temporary Password: {password}. "
+                                    f"Complete the verification to enable access."
+                                )\
+                                .set_recipients(recipient)\
+                                ()
+                            
+                            logger.info(f"Verification email sent to {recipient}")
+                            
+                    except Exception as e:
+                        logger.error(f"Background email sending failed: {str(e)}")
+
+        #! Method 1: Using ThreadPoolExecutor (RECOMMENDED)
+        self.thread_pool.submit(send_content, user, contact_type, contact, password)
+
+
+        logger.info(f"Welcome message sent to {contact}")
 
 
     def _send_complete_registration_message_async(self, user, contact_type, contact):
@@ -406,6 +448,7 @@ Data collector email or phone verification view
 '''
 class VerifyOTPView(APIView):
     def post(self, request):
+        print("request.data", request.data)
         serializer = VerifyOTPSerializer(data=request.data)
         if serializer.is_valid():
             return Response(data = serializer.validated_data, status=status.HTTP_200_OK)
@@ -423,6 +466,8 @@ class SendVerificationView(APIView):
             print("serializer.validated_data", serializer.validated_data)
             user = serializer.validated_data['user']
             contact_type = serializer.validated_data['contact_type']
+            account_type = serializer.validated_data['account_type']
+            contact = serializer.validated_data['contact']
             # Generate OTP
             otp = generate_verification_code()
              # send otp via email or phone
@@ -432,7 +477,7 @@ class SendVerificationView(APIView):
                     ...
                 case 'email':
                     user.email_code = otp
-                    self._send_verification_async(user, otp)
+                    self._send_verification_async(user, otp, account_type,contact)
             
             user.save(update_fields=['phone_code' if contact_type == 'phone' else 'email_code'])
             return Response({
@@ -442,12 +487,16 @@ class SendVerificationView(APIView):
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def _send_verification_async(self, user, otp):
+    def _send_verification_async(self, user, otp, account_type,contact):
+
         """Send verification using threading for better performance"""
         def send_email_task():
             try:
                 verification_code = otp
-                recipient = user.phone or user.email
+                if account_type != 'sub-account':
+                    recipient = user.phone or user.email
+                else:
+                    recipient = contact
                 
                 if recipient:
                     # Cache the verification code for later validation

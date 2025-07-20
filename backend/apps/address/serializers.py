@@ -62,7 +62,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'user',
             'name_en', 'name_bn',
             'phone', 'gurdian_phone',
-            'nid', 'gurdian_nid',
+            'nid', 'guardian_nid',
             'father_name_en', 'father_name_bn',
             'mother_name_en', 'mother_name_bn',
             'spouse_name_en', 'spouse_name_bn',

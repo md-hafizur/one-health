@@ -111,7 +111,7 @@ class UserProfile(models.Model):
     relationship = models.CharField(max_length=100, choices=[('Son', 'Son'), ('Daughter', 'Daughter'), ('Brother', 'Brother'), ('Sister', 'Sister'), ('Other', 'Other')], blank=True, null=True)
 
     nid = models.CharField(max_length=17, blank=True, null=True)
-    gurdian_nid = models.CharField(max_length=17, blank=True, null=True)
+    guardian_nid = models.CharField(max_length=17, blank=True, null=True)
 
     # Parents/Spouse Info
     father_name_en = models.CharField(max_length=100, blank=True, null=True)
