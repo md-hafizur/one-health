@@ -34,6 +34,8 @@ class UserSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.all())
     confirm_password = serializers.CharField(write_only=True)
+    guardian_nid = serializers.CharField(required=False,allow_null=True)
+    account_type = serializers.CharField(required=False,allow_null=True)
 
     class Meta:
         model = User
@@ -54,36 +56,53 @@ class UserSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
 
+        print("attrs((((((((((()))))))))))", attrs)
+
         phone = attrs.get('phone')
         email = attrs.get('email')
         parent = attrs.get('parent')
         password = attrs.get('password')
         confirm_password = attrs.get('confirm_password')
-        
-        if password != confirm_password:
-            raise serializers.ValidationError({
-                "password": "Passwords do not match."
-            })
+        account_type = attrs.get("account_type")
 
-        if not parent and phone and User.objects.filter(phone=phone, parent__isnull=True).exists():
-            raise serializers.ValidationError({"phone": "Phone number must be unique for main users (non-sub users)."})
+        if account_type != "sub-account":
+            if password != confirm_password:
+                raise serializers.ValidationError({
+                    "password": "Passwords do not match."
+                })
+            if not parent and phone and User.objects.filter(phone=phone, parent__isnull=True).exists():
+                raise serializers.ValidationError({"phone": "Phone number must be unique for main users (non-sub users)."})
 
-        if not phone and not email:
-            raise serializers.ValidationError({
-                "unique_field_error": "Either phone or email must be provided.",
-            })
+            if not phone and not email:
+                raise serializers.ValidationError({
+                    "unique_field_error": "Either phone or email must be provided.",
+                })
+        else:
+            guardian_nid = attrs.get('guardian_nid')
+            parent = attrs.get('parent')  # Already a User instance
+
+            # Validate that parent's userprofile.nid matches guardian_nid
+            if not parent or not hasattr(parent, "userprofile") or parent.userprofile.nid != guardian_nid:
+                raise serializers.ValidationError({
+                    "parent": "Parent account not found or NID mismatch.",
+                })
 
         return attrs
 
     def create(self, validated_data):
         validated_data.pop("confirm_password", None)
+        validated_data.pop('account_type', None)
+        validated_data.pop('guardian_nid', None)
         user = User.objects.create_user(**validated_data)
         return user
 
     
     def update(self, instance, validated_data):
+        validated_data.pop('account_type', None)
         validated_data.pop('confirm_password', None)
         password = validated_data.pop('password', None)
+        validated_data.pop('guardian_nid', None)
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if password:
@@ -119,67 +138,97 @@ class UserSerializer(serializers.ModelSerializer):
 class VerifyOTPSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
     otp = serializers.CharField(max_length=6)
+    account_type = serializers.CharField(required=False,allow_null=True)
+    contact_type = serializers.CharField(required=False,allow_null=True)
 
     def validate(self, data):
         user_id = data.get("user_id")
         otp = data.get("otp")
+        account_type = data.get("account_type")
+        contact_type = data.get("contact_type")
 
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            raise serializers.ValidationError("User not found.")
+        if account_type != "sub-account":
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                raise serializers.ValidationError("User not found.")
 
-        verification_attempts = [
-            {
-                'contact_type': 'email',
-                'contact_field': user.email,
-                'code_field': user.email_code,
-                'verified_field': 'email_verified',
-                'error_msg': 'Invalid OTP for email.',
-                'verified_contact_display': 'Email',
-                'verification_method_display': 'Email'
-            },
-            {
-                'contact_type': 'phone',
-                'contact_field': user.phone,
-                'code_field': user.phone_code,
-                'verified_field': 'phone_verified',
-                'error_msg': 'Invalid OTP for phone.',
-                'verified_contact_display': 'Phone Number',
-                'verification_method_display': 'Phone Number'
-            }
-        ]
+            verification_attempts = [
+                {
+                    'contact_type': 'email',
+                    'contact_field': user.email,
+                    'code_field': user.email_code,
+                    'verified_field': 'email_verified',
+                    'error_msg': 'Invalid OTP for email.',
+                    'verified_contact_display': 'Email',
+                    'verification_method_display': 'Email'
+                },
+                {
+                    'contact_type': 'phone',
+                    'contact_field': user.phone,
+                    'code_field': user.phone_code,
+                    'verified_field': 'phone_verified',
+                    'error_msg': 'Invalid OTP for phone.',
+                    'verified_contact_display': 'Phone Number',
+                    'verification_method_display': 'Phone Number'
+                }
+            ]
 
-        for attempt in verification_attempts:
-            if attempt['contact_field'] and not getattr(user, attempt['verified_field']):
-                if attempt['code_field'] == otp:
-                    # Set verified status
-                    setattr(user, attempt['verified_field'], True)
-                    # Explicitly set code to None
-                    if attempt['contact_type'] == 'email':
-                        user.email_code = None
-                    elif attempt['contact_type'] == 'phone':
-                        user.phone_code = None
-                    user.save() # Save the user object with updated status and cleared code
-                    return self._get_verification_success_data(
-                        user,
-                        attempt['verified_contact_display'],
-                        attempt['verification_method_display']
-                    )
-                else:
-                    raise serializers.ValidationError({"otp": attempt['error_msg']})
+            for attempt in verification_attempts:
+                if attempt['contact_field'] and not getattr(user, attempt['verified_field']):
+                    if attempt['code_field'] == otp:
+                        # Set verified status
+                        setattr(user, attempt['verified_field'], True)
+                        # Explicitly set code to None
+                        if attempt['contact_type'] == 'email':
+                            user.email_code = None
+                        elif attempt['contact_type'] == 'phone':
+                            user.phone_code = None
+                        user.save() # Save the user object with updated status and cleared code
+                        return self._get_verification_success_data(
+                            user,
+                            attempt['verified_contact_display'],
+                            attempt['verification_method_display']
+                        )
+                    else:
+                        raise serializers.ValidationError({"otp": attempt['error_msg']})
 
-        # If loop finishes, no unverified contact was found or both are already verified
-        if user.email_verified and user.phone_verified:
-            raise serializers.ValidationError("Both email and phone are already verified.")
-        elif not user.email and not user.phone:
-            raise serializers.ValidationError("User has no email or phone to verify.")
+            # If loop finishes, no unverified contact was found or both are already verified
+            if user.email_verified and user.phone_verified:
+                raise serializers.ValidationError("Both email and phone are already verified.")
+            elif not user.email and not user.phone:
+                raise serializers.ValidationError("User has no email or phone to verify.")
+            else:
+                # This case should ideally not be reached if the above logic is comprehensive,
+                # but it covers any remaining edge cases where an unverified contact exists
+                # but wasn't caught by the loop (e.g., if contact_field is None but verified_field is False,
+                # which shouldn't happen if data integrity is maintained).
+                raise serializers.ValidationError("No unverified contact field found for this user.")
+
         else:
-            # This case should ideally not be reached if the above logic is comprehensive,
-            # but it covers any remaining edge cases where an unverified contact exists
-            # but wasn't caught by the loop (e.g., if contact_field is None but verified_field is False,
-            # which shouldn't happen if data integrity is maintained).
-            raise serializers.ValidationError("No unverified contact field found for this user.")
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                raise serializers.ValidationError("User not found.")
+
+            contact_type = data.get("contact_type")
+            match contact_type:
+                case 'email':
+                    if user.email_code == otp:
+                        user.email_code = None
+                        user.email_verified = True
+                        user.save()
+                        return self._get_verification_success_data(user, "Email", "Email")
+                    else:
+                        raise serializers.ValidationError("Invalid OTP for email.")
+                case 'phone':
+                    if user.phone_code == otp:
+                        user.phone_code = None
+                        user.phone_verified = True
+                        user.save()
+                        return self._get_verification_success_data(user, "Phone Number", "Phone Number")
+                    else:
+                        raise serializers.ValidationError("Invalid OTP for phone.")
 
     def _get_verification_success_data(self, user, verified_contact, verification_method):
         fee = None
@@ -210,20 +259,29 @@ class SendVerificationSerializer(serializers.Serializer):
     contact = serializers.CharField()
     contact_type = serializers.CharField()
     user_id = serializers.IntegerField()
+    account_type = serializers.CharField()
 
     def validate(self, data):
         user_id = data.get("user_id")
         contact = data.get("contact")
         contact_type = data.get("contact_type")
 
-        try:
-            user = User.objects.get(
-                Q(id=user_id, email=contact) |
-                Q(id=user_id, phone=contact)
-            )
-        except User.DoesNotExist:
-            raise serializers.ValidationError("User not found.")
+        account_type = data.get("account_type")
+        if account_type != "sub-account":
+            try:
+                user = User.objects.get(
+                    Q(id=user_id, email=contact) |
+                    Q(id=user_id, phone=contact)
+                )
+            except User.DoesNotExist:
+                raise serializers.ValidationError("User not found.")
 
+        else:
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                raise serializers.ValidationError("User not found.")
+                
         data['user'] = user
         data['contact_type'] = contact_type
 

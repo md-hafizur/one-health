@@ -10,7 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ChevronDown, ChevronRight, Search, Eye, CreditCard, FileText, Users, ArrowUpDown } from "lucide-react"
 import { PaymentModal } from "./payment-modal"
+import { OtpVerificationModal } from "./otp-verification-modal"
 import { toast } from "sonner"
+import { LoadingScreen } from "../app/LoadingScreen"
+import { getCookie } from "../lib/utils/csrf"
 
 interface User {
   id: string
@@ -40,13 +43,15 @@ export function RegisteredUsersTable() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all")
   const [verificationStatusFilter, setVerificationStatusFilter] = useState("all")
   
-  const [sortBy, setSortBy] = useState("first_name")
+  const [sortBy, setSortBy] = useState("")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage, setRecordsPerPage] = useState(5)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showOtpModal, setShowOtpModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [verifyingUser, setVerifyingUser] = useState<User | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
   const [nextPageUrl, setNextPageUrl] = useState<string | null>(null)
@@ -195,12 +200,153 @@ export function RegisteredUsersTable() {
     toast.success("Payment successful! Digital card will be issued.")
   }
 
+  const handleVerifyClick = async (user: User) => {
+    setVerifyingUser(user)
+    const contact = user.email || user.phone
+    const contactType = user.email ? "email" : "phone"
+
+    if (!contact) {
+      toast.error("No contact information available for this user.")
+      return
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const csrfToken = getCookie('csrftoken')
+      const response = await fetch(`${apiUrl}/accounts/send-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          'X-CSRFToken': csrfToken || '',
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          contact: contact,
+          contact_type: contactType,
+        }),
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      toast.success(data.detail || `OTP sent to ${contact}`)
+      setShowOtpModal(true)
+    } catch (e: any) {
+      toast.error(`Failed to send OTP: ${e.message}`)
+    }
+  }
+
+  const handleOtpVerify = async (otp: string) => {
+    if (!verifyingUser) return
+
+    const contact = verifyingUser.email || verifyingUser.phone
+    const contactType = verifyingUser.email ? "email" : "phone"
+
+    if (!contact) {
+      toast.error("No contact information available for this user.")
+      return
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const csrfToken = getCookie('csrftoken')
+      const response = await fetch(`${apiUrl}/accounts/verify-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          'X-CSRFToken': csrfToken || '',
+        },
+        body: JSON.stringify({
+          user_id: verifyingUser.id,
+          contact: contact,
+          contact_type: contactType,
+          otp: otp,
+        }),
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      toast.success(data.detail || "User verified successfully!")
+
+      // Update user state
+      const newUsers = users.map((u) => {
+        if (u.id === verifyingUser.id) {
+          return { ...u, verificationStatus: "verified" as const }
+        }
+        if (u.children) {
+          return {
+            ...u,
+            children: u.children.map((c) =>
+              c.id === verifyingUser.id ? { ...c, verificationStatus: "verified" as const } : c
+            ),
+          }
+        }
+        return u
+      })
+      setUsers(newUsers)
+
+      setShowOtpModal(false)
+      setVerifyingUser(null)
+    } catch (e: any) {
+      toast.error(`Verification failed: ${e.message}`)
+    }
+  }
+
+  const handleOtpResend = async () => {
+    if (!verifyingUser) return
+
+    const contact = verifyingUser.email || verifyingUser.phone
+    const contactType = verifyingUser.email ? "email" : "phone"
+
+    if (!contact) {
+      toast.error("No contact information available for this user.")
+      return
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      const csrfToken = getCookie('csrftoken')
+      const response = await fetch(`${apiUrl}/accounts/send-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          'X-CSRFToken': csrfToken || '',
+        },
+        body: JSON.stringify({
+          user_id: verifyingUser.id,
+          contact: contact,
+          contact_type: contactType,
+        }),
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      toast.success(data.detail || `OTP resent to ${contact}`)
+    } catch (e: any) {
+      toast.error(`Failed to resend OTP: ${e.message}`)
+    }
+  }
+
   const totalPages = Math.ceil(totalUsers / recordsPerPage)
   const startIndex = (currentPage - 1) * recordsPerPage
 
   return (
     <>
-      <Card className="shadow-lg rounded-lg">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl font-bold text-gray-800 dark:text-gray-100">
             <Users className="h-5 w-5 text-blue-600" />
@@ -255,7 +401,7 @@ export function RegisteredUsersTable() {
           </div>
 
           {/* Table */}
-          {loading && <p className="text-center py-8">Loading users...</p>}
+          {loading && <LoadingScreen />}
           {error && <p className="text-center py-8 text-red-500">Error: {error}</p>}
           {!loading && !error && users.length === 0 && (
             <p className="text-center py-8">No registered users found.</p>
@@ -276,7 +422,7 @@ export function RegisteredUsersTable() {
                         <ArrowUpDown className="ml-2 h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</TableHead>
+                    <TableHead className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ACCOUNT TYPE</TableHead>
                     <TableHead className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       <Button
                         variant="ghost"
@@ -390,7 +536,7 @@ export function RegisteredUsersTable() {
                                   variant="outline"
                                   size="sm"
                                   disabled={!user.email && !user.phone}
-                                  onClick={() => toast.info(`Verification link sent to ${user.email || user.phone}`)}
+                                  onClick={() => handleVerifyClick(user)}
                                   className="text-blue-600 border-blue-200 hover:bg-blue-50"
                                 >
                                   <FileText className="h-4 w-4 mr-1" />
@@ -494,7 +640,7 @@ export function RegisteredUsersTable() {
                                       variant="outline"
                                       size="sm"
                                       disabled={!child.email && !child.phone}
-                                      onClick={() => toast.info(`Verification link sent to ${child.email || child.phone}`)}
+                                      onClick={() => handleVerifyClick(child)}
                                       className="text-blue-600 border-blue-200 hover:bg-blue-50"
                                     >
                                       <FileText className="h-4 w-4 mr-1" />
@@ -587,6 +733,17 @@ export function RegisteredUsersTable() {
             id: selectedUser.id,
             serviceCode: selectedUser.serviceCode,
           }}
+        />
+      )}
+
+      {/* OTP Verification Modal */}
+      {verifyingUser && (
+        <OtpVerificationModal
+          open={showOtpModal}
+          onOpenChange={setShowOtpModal}
+          onVerify={handleOtpVerify}
+          onResend={handleOtpResend}
+          contact={verifyingUser.email || verifyingUser.phone || ""}
         />
       )}
     </>
