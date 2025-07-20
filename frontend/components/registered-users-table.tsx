@@ -202,28 +202,46 @@ export function RegisteredUsersTable() {
 
   const handleVerifyClick = async (user: User) => {
     setVerifyingUser(user)
-    const contact = user.email || user.phone
-    const contactType = user.email ? "email" : "phone"
+
+    let contact = user.email || user.phone
+    let contactType = user.email ? "email" : "phone"
+    const userIdForApi = user.id
+
+    if (user.role === "Child" && user.parent_id) {
+      const parent = users.find((p) => p.id === user.parent_id)
+      if (parent) {
+        contact = parent.email || parent.phone
+        contactType = parent.email ? "email" : "phone"
+      } else {
+        toast.error("Parent account not found for this child.")
+        return
+      }
+    }
 
     if (!contact) {
-      toast.error("No contact information available for this user.")
+      toast.error("No contact information available for verification.")
       return
     }
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      const csrfToken = getCookie('csrftoken')
+      const csrfToken = getCookie("csrftoken")
+      const payload: any = {
+        user_id: userIdForApi,
+        contact: contact,
+        contact_type: contactType,
+      }
+      if (user.role === "Child") {
+        payload.account_type = "sub-account"
+      }
+
       const response = await fetch(`${apiUrl}/accounts/send-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          'X-CSRFToken': csrfToken || '',
+          "X-CSRFToken": csrfToken || "",
         },
-        body: JSON.stringify({
-          user_id: user.id,
-          contact: contact,
-          contact_type: contactType,
-        }),
+        body: JSON.stringify(payload),
         credentials: "include",
       })
 
@@ -243,8 +261,20 @@ export function RegisteredUsersTable() {
   const handleOtpVerify = async (otp: string) => {
     if (!verifyingUser) return
 
-    const contact = verifyingUser.email || verifyingUser.phone
-    const contactType = verifyingUser.email ? "email" : "phone"
+    let contact = verifyingUser.email || verifyingUser.phone
+    let contactType = verifyingUser.email ? "email" : "phone"
+    const userIdForApi = verifyingUser.id
+
+    if (verifyingUser.role === "Child" && verifyingUser.parent_id) {
+      const parent = users.find((p) => p.id === verifyingUser.parent_id)
+      if (parent) {
+        contact = parent.email || parent.phone
+        contactType = parent.email ? "email" : "phone"
+      } else {
+        toast.error("Parent account not found for this child.")
+        return
+      }
+    }
 
     if (!contact) {
       toast.error("No contact information available for this user.")
@@ -253,19 +283,24 @@ export function RegisteredUsersTable() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      const csrfToken = getCookie('csrftoken')
+      const csrfToken = getCookie("csrftoken")
+      const payload: any = {
+        user_id: userIdForApi,
+        contact: contact,
+        contact_type: contactType,
+        otp: otp,
+      }
+      if (verifyingUser.role === "Child") {
+        payload.account_type = "sub-account"
+      }
+
       const response = await fetch(`${apiUrl}/accounts/verify-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          'X-CSRFToken': csrfToken || '',
+          "X-CSRFToken": csrfToken || "",
         },
-        body: JSON.stringify({
-          user_id: verifyingUser.id,
-          contact: contact,
-          contact_type: contactType,
-          otp: otp,
-        }),
+        body: JSON.stringify(payload),
         credentials: "include",
       })
 
@@ -304,8 +339,20 @@ export function RegisteredUsersTable() {
   const handleOtpResend = async () => {
     if (!verifyingUser) return
 
-    const contact = verifyingUser.email || verifyingUser.phone
-    const contactType = verifyingUser.email ? "email" : "phone"
+    let contact = verifyingUser.email || verifyingUser.phone
+    let contactType = verifyingUser.email ? "email" : "phone"
+    const userIdForApi = verifyingUser.id
+
+    if (verifyingUser.role === "Child" && verifyingUser.parent_id) {
+      const parent = users.find((p) => p.id === verifyingUser.parent_id)
+      if (parent) {
+        contact = parent.email || parent.phone
+        contactType = parent.email ? "email" : "phone"
+      } else {
+        toast.error("Parent account not found for this child.")
+        return
+      }
+    }
 
     if (!contact) {
       toast.error("No contact information available for this user.")
@@ -314,18 +361,23 @@ export function RegisteredUsersTable() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      const csrfToken = getCookie('csrftoken')
+      const csrfToken = getCookie("csrftoken")
+      const payload: any = {
+        user_id: userIdForApi,
+        contact: contact,
+        contact_type: contactType,
+      }
+      if (verifyingUser.role === "Child") {
+        payload.account_type = "sub-account"
+      }
+
       const response = await fetch(`${apiUrl}/accounts/send-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          'X-CSRFToken': csrfToken || '',
+          "X-CSRFToken": csrfToken || "",
         },
-        body: JSON.stringify({
-          user_id: verifyingUser.id,
-          contact: contact,
-          contact_type: contactType,
-        }),
+        body: JSON.stringify(payload),
         credentials: "include",
       })
 
@@ -639,12 +691,12 @@ export function RegisteredUsersTable() {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      disabled={!child.email && !child.phone}
+                                      disabled={!user.email && !user.phone}
                                       onClick={() => handleVerifyClick(child)}
                                       className="text-blue-600 border-blue-200 hover:bg-blue-50"
                                     >
                                       <FileText className="h-4 w-4 mr-1" />
-                                      Verify {child.email ? "Email" : "Phone"}
+                                      Verify {user.email ? "Email" : "Phone"}
                                     </Button>
                                     <Button
                                       variant="outline"
