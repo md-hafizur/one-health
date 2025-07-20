@@ -35,6 +35,7 @@ export default function SubAccountRegistrationPage() {
   const [step, setStep] = useState(1)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedParent, setSelectedParent] = useState<ParentUser | null>(null)
+  const [selectedParentName, setSelectedParentName] = useState<string>("");
   const [subAccountData, setSubAccountData] = useState<SubAccountData | null>(null);
   const [formData, setFormData] = useState({
     first_name_en: '',
@@ -92,11 +93,9 @@ export default function SubAccountRegistrationPage() {
   }
 
   const handleSelectParent = (parent: ParentUser) => {
-    setSelectedParent({
-      ...parent,
-      name: `${parent.first_name} ${parent.last_name}`,
-    })
-    setStep(2)
+    setSelectedParent(parent);
+    setSelectedParentName(`${parent.first_name} ${parent.last_name}`);
+    setStep(2);
   }
 
   const handleNext = () => {
