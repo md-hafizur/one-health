@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { LoadingScreen } from "../app/LoadingScreen"
 
 
 interface PendingCollector {
@@ -49,6 +50,7 @@ export function PendingCollectorsTable() {
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [collectorToReject, setCollectorToReject] = useState<PendingCollector | null>(null)
   const [rejectionContact, setRejectionContact] = useState("")
+  const [loading, setLoading] = useState(true) // Add loading state
   const apiUrl = process.env.NEXT_PUBLIC_API_URL
 
   useEffect(() => {
@@ -61,6 +63,7 @@ export function PendingCollectorsTable() {
 
   const fetchPendingCollectors = async () => {
     if (!visitorId) return;
+    setLoading(true); // Set loading to true before fetching
     try {
       const response = await fetch(`${apiUrl}/data/pending-application-table`, {
         headers: {
@@ -77,6 +80,8 @@ export function PendingCollectorsTable() {
     } catch (error) {
       console.error("Error fetching pending collectors:", error)
       toast.error("Failed to fetch pending applications.")
+    } finally {
+      setLoading(false); // Set loading to false after fetching (or error)
     }
   }
 
@@ -203,6 +208,10 @@ export function PendingCollectorsTable() {
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  if (loading) {
+    return <LoadingScreen />;
   }
 
   return (

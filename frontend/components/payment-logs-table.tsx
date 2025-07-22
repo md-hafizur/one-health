@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Download } from "lucide-react"
+import { LoadingScreen } from "../app/LoadingScreen"
 
 import { getCurrentBrowserFingerPrint } from "@rajesh896/broprint.js"
 
@@ -34,6 +35,7 @@ export function PaymentLogsTable() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(10)
   const [visitorId, setVisitorId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true) // Add loading state
 
   useEffect(() => {
     const getFingerprint = async () => {
@@ -46,6 +48,7 @@ export function PaymentLogsTable() {
   useEffect(() => {
     const fetchPaymentLogs = async () => {
       if (!visitorId) return
+      setLoading(true) // Set loading to true before fetching
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL
         const response = await fetch(
@@ -69,6 +72,8 @@ export function PaymentLogsTable() {
         setPreviousPage(data.previous)
       } catch (error: any) {
         toast.error(`Error fetching payment logs: ${error.message}`)
+      } finally {
+        setLoading(false) // Set loading to false after fetching (or error)
       }
     }
     fetchPaymentLogs()
@@ -101,6 +106,10 @@ export function PaymentLogsTable() {
     URL.revokeObjectURL(url);
     toast.success(`Payment log ${payment.payment_id} downloaded.`);
   };
+
+  if (loading) {
+    return <LoadingScreen />; // Render LoadingScreen when loading
+  }
 
   return (
     <div>
