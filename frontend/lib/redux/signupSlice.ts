@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from './store';
 
-interface SignupState {
+export interface SignupState {
   firstName: string;
   lastName: string;
   contactInfo: string;

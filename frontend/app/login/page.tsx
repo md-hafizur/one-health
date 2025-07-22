@@ -15,7 +15,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useDispatch, useSelector } from "react-redux"
-import { setField, selectSignup, resetSignup } from "@/lib/redux/signupSlice"
+import { setField, selectSignup, resetSignup, SignupState } from "@/lib/redux/signupSlice"
 import { setLogin, selectAuth, setAllowLoginAccess } from "@/lib/redux/authSlice"
 import type { RootState } from "@/lib/redux/store"
 import { getCookie } from "@/lib/utils/csrf";
@@ -51,14 +51,28 @@ export default function LoginPage() {
   }, [isClient]);
 
   useEffect(() => {
-    if (isClient && authData.isAuthenticated && (authData.phoneVerified || authData.emailVerified)  && !authData.allowLoginAccessWhileAuthenticated) {
-      router.push("/collector/dashboard"); // Or appropriate dashboard based on role
+    if (isClient && authData.isAuthenticated && (authData.phoneVerified || authData.emailVerified) && !authData.allowLoginAccessWhileAuthenticated) {
+      switch (authData.userRole) {
+        case "admin":
+          router.push("/admin/dashboard");
+          break;
+        case "collector":
+          router.push("/collector/dashboard");
+          break;
+        case "public":
+          router.push("/user/dashboard");
+          break;
+        default:
+          // Fallback or error handling for unknown roles
+          router.push("/");
+          break;
+      }
     }
-  }, [isClient, authData.isAuthenticated, authData.paymentMade, authData.allowLoginAccessWhileAuthenticated]);
+  }, [isClient, authData.isAuthenticated, authData.paymentMade, authData.allowLoginAccessWhileAuthenticated, authData.userRole]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    dispatch(setField({ field: id as keyof typeof signUpData, value: value as any }));
+    dispatch(setField({ field: id as keyof SignupState, value: value as any }));
   }
 
   const handleLogin = async (role: string) => {
@@ -154,11 +168,78 @@ export default function LoginPage() {
       // Simulate login and redirect based on role for other roles
       switch (role) {
         case "admin":
-          router.push("/admin/dashboard")
-          break
+          if (!visitorId) {
+            toast.error("Visitor ID not generated. Please try again.")
+            return
+          }
+
+          const isEmail = loginData.username.includes("@")
+          const payload = {
+            [isEmail ? "email" : "phone"]: loginData.username,
+            password: loginData.password,
+          }
+          try {
+
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+            const response = await fetch(`${apiUrl}/auth/login`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Visitor-ID": visitorId,
+                "X-CSRFToken": getCookie("csrftoken") || "",
+              },
+              body: JSON.stringify({
+                ...payload,
+              }),
+              credentials: "include",
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+              toast.error(result.message || "An unknown error occurred during admin login.");
+              return;
+            }
+
+            toast.success(result.message || "Admin login successful!");
+            dispatch(setLogin({ role: "admin", phoneVerified: true, emailVerified: true, applicationId: result.id, contact: result.email || result.phone, contactType: result.email ? "email" : "phone", firstName: result.first_name, lastName: result.last_name, paymentMade: true }));
+            router.push("/admin/dashboard");
+          } catch (error) {
+            console.error("Admin Login Error:", error);
+            toast.error("An unexpected error occurred during admin login. Please try again later.");
+          }
+          break;
         case "public":
-          router.push("/user/dashboard")
-          break
+          try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+            const response = await fetch(`${apiUrl}/auth/login`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken") || "",
+              },
+              body: JSON.stringify({
+                username: loginData.username,
+                password: loginData.password,
+              }),
+              credentials: "include",
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+              toast.error(result.message || "An unknown error occurred during public user login.");
+              return;
+            }
+
+            toast.success(result.message || "Public user login successful!");
+            dispatch(setLogin({ role: "public", phoneVerified: result.phone_verified ?? false, emailVerified: result.email_verified ?? false, applicationId: result.id, contact: result.email || result.phone, contactType: result.email ? "email" : "phone", firstName: result.first_name, lastName: result.last_name, paymentMade: result.payment_made ?? false }));
+            router.push("/user/dashboard");
+          } catch (error) {
+            console.error("Public User Login Error:", error);
+            toast.error("An unexpected error occurred during public user login. Please try again later.");
+          }
+          break;
       }
     }
   }
