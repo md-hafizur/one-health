@@ -13,7 +13,8 @@ class PaymentLogAdmin(admin.ModelAdmin):
     list_display = ('payment', 'message', 'created_at')
     list_filter = ('created_at',)
     search_fields = ('payment__transaction_id', 'message')
-    raw_id_fields = ('payment',)
+    # raw_id_fields = ('payment',)  ← remove or comment this
+
 
 @admin.register(PaymentFee)
 class PaymentFeeAdmin(admin.ModelAdmin):
