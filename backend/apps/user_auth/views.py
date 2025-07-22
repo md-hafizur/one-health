@@ -239,3 +239,57 @@ class UserDetail(APIView):
         user = request.user
         serializer = UserSerializer(user, context={"request": request})
         return Response(serializer.data)
+
+class ApprovedUser(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_role = getattr(request.user.role, 'name', None)
+        if user_role != 'admin':
+            return Response({"status": "error", "message": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        approved = request.data.get('approved')
+        rejected = request.data.get('rejected')
+        user_id = request.data.get('id')
+        contact = request.data.get('contact')
+
+        if not user_id:
+            return Response({"status": "error", "message": "User ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user_to_update = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"status": "warning", "message": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if user_to_update.role.name != 'dataCollector':
+            return Response({"status": "warning", "message": "User is not a data collector"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if approved is True:
+            user_to_update.approved = True
+            user_to_update.rejected = False
+            user_to_update.approved_by = request.user
+            user_to_update.approved_at = timezone.now()
+            user_to_update.save(update_fields=['approved','rejected', 'approved_by', 'approved_at'])
+            return Response({"status": "success", "message": f"User {user_to_update.first_name} approved"}, status=status.HTTP_200_OK)
+
+        elif rejected is True:
+            if not contact:
+                return Response({"status": "error", "message": "Contact is required to reject user"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if user_to_update.email != contact and user_to_update.phone != contact:
+                return Response({"status": "error", "message": "Contact does not match with user"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Reject logic here
+            user_to_update.rejected = True
+            user_to_update.approved = False
+            user_to_update.rejected_by = request.user
+            user_to_update.rejected_at = timezone.now()
+            user_to_update.save(update_fields=['rejected', 'approved', 'rejected_by', 'rejected_at'])
+            return Response({
+                "status": "success",
+                "message": f"User {user_to_update.first_name} rejected successfully"
+            }, status=status.HTTP_200_OK)
+
+        else:
+            return Response({"status": "error", "message": "Invalid action. Provide either approved=True or rejected=True"}, status=status.HTTP_400_BAD_REQUEST)

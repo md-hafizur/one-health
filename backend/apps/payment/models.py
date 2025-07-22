@@ -1,7 +1,8 @@
 from django.db import models
 from apps.accounts.models import User, Role
+from core.utils.modeler import BaseModel
 
-class Payment(models.Model):
+class Payment(BaseModel):
     PAYMENT_METHODS = (
         ('bkash', 'bKash'),
         ('nagad', 'Nagad')
@@ -29,13 +30,13 @@ class Payment(models.Model):
     def __str__(self):
         return f"{self.user.email}'s payment of {self.amount} via {self.payment_method}"
 
-class PaymentLog(models.Model):
+class PaymentLog(BaseModel):
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='logs')
     message = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
 
 
-class PaymentFee(models.Model):
+class PaymentFee(BaseModel):
     role = models.OneToOneField(Role, on_delete=models.CASCADE, related_name='payment_fee')
     fee_name = models.CharField(max_length=100, default="Standard Fee")
     amount = models.DecimalField(max_digits=10, decimal_places=2)

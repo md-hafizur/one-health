@@ -36,6 +36,7 @@ class UserSerializer(serializers.ModelSerializer):
     confirm_password = serializers.CharField(write_only=True)
     guardian_nid = serializers.CharField(required=False,allow_null=True)
     account_type = serializers.CharField(required=False,allow_null=True)
+    roleName = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -53,10 +54,11 @@ class UserSerializer(serializers.ModelSerializer):
     def get_name(self, obj):
         return obj.get_full_name()
 
+    def get_roleName(self, obj):
+        return obj.role.name if obj.role else None
+
 
     def validate(self, attrs):
-
-        print("attrs((((((((((()))))))))))", attrs)
 
         phone = attrs.get('phone')
         email = attrs.get('email')

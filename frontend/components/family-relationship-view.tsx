@@ -71,7 +71,8 @@ export function FamilyRelationshipView({ collectors = [] }: CollectorRelationshi
     setExpandedFamilies(newExpanded)
   }
 
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "";
     return name
       .split(" ")
       .map((n) => n[0])
@@ -337,7 +338,7 @@ export function FamilyRelationshipView({ collectors = [] }: CollectorRelationshi
                                       {/* Connection Lines */}
                                       <div className="absolute left-8 top-0 w-px h-full bg-blue-300"></div>
                                       <div className="absolute left-8 top-6 w-8 h-px bg-blue-300"></div>
-                                      {subIndex === publicAccount.subAccounts!.length - 1 && (
+                                      {subIndex === (publicAccount.subAccounts?.length || 0) - 1 && (
                                         <div className="absolute left-8 top-6 w-px h-6 bg-purple-50"></div>
                                       )}
 
@@ -438,4 +439,3 @@ export function FamilyRelationshipView({ collectors = [] }: CollectorRelationshi
       ))}
     </div>
   )
-}

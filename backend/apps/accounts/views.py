@@ -176,18 +176,19 @@ class RegisterUserView(APIView):
         parent_id = user_data.get('user_data',{}).get('parent')
         if not parent_id:
             raise ValueError("Parent ID is required for sub-account")
-        
+        first_name = user_data.get('user_data',{}).get('first_name')
+        last_name = user_data.get('user_data',{}).get('last_name')
         # Optimized parent validation (cache if needed)
         parent_user = get_object_or_404(User, pk=parent_id)
         
         # Parent user contact type 
         contact = parent_user.phone or parent_user.email
         if contact:
-            username = f"sub_{contact}"
+            username = f"{first_name}-{last_name}"
         
         user_data['user_data'].update({
             'parent': parent_user.id,
-            'role': self._get_role_cached('public').id,
+            'role': self._get_role_cached('subUser').id,
             'username' : username
         })
         return user_data

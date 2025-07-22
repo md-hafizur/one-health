@@ -5,7 +5,7 @@ from django.db.models import Q
 from apps.address.models import Address
 from core.validators import phone_validator
 
-class Role(models.Model):
+class Role(BaseModel):
     name = models.CharField(max_length=50, unique=True)
     label = models.CharField(max_length=100) 
 
@@ -46,13 +46,16 @@ class User(AbstractUser, BaseModel):
         related_name='added_by'
     )
 
-    rejectedBy = models.ForeignKey(
+    rejected = models.BooleanField(default=False)
+
+    rejected_by = models.ForeignKey(
         "self",
-        related_name="rejected_by",
+        related_name="user_rejected_by",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
+    rejected_at = models.DateTimeField(null=True, blank=True)
 
     email_verified = models.BooleanField(default=False)
     phone_verified = models.BooleanField(default=False)
@@ -61,6 +64,15 @@ class User(AbstractUser, BaseModel):
     phone_code = models.CharField(max_length=6, null=True, blank=True)
 
     payment_status = models.CharField(max_length=10, choices=[('Paid', 'Paid'), ('Pending', 'Pending'), ('Failed', 'Failed')], default='Pending')
+    approved = models.BooleanField(default=False)
+    approved_by = models.ForeignKey(
+        "self",
+        related_name="user_approved_by",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
 
     sub_account_status = models.CharField(
         max_length=10,
@@ -91,7 +103,7 @@ class User(AbstractUser, BaseModel):
         return self.username or self.email or self.phone or f"User-{self.pk}"
 
 
-class UserProfile(models.Model):
+class UserProfile(BaseModel):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
 
     # Core profile

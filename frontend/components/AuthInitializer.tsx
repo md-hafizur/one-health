@@ -18,15 +18,22 @@ export function AuthInitializer({ children }: { children: React.ReactNode }) {
         // Only hydrate Redux state from localStorage on client
         const persisted = loadState();
         if (persisted && persisted.auth) {
-            dispatch(setLogin(persisted.auth));
+            const { userRole, firstName, lastName, phoneVerified, emailVerified, applicationId, contact, contactType, paymentMade } = persisted.auth;
+            dispatch(setLogin({ role: userRole, firstName, lastName, phoneVerified, emailVerified, applicationId, contact, contactType, paymentMade }));
         }
         dispatch(setAuthInitialized());
         setHydrated(true);
     }, [dispatch]);
 
     useEffect(() => {
-        if (!isInitializing && isAuthenticated && userRole === 'collector' && !phoneVerified && !emailVerified) {
-            router.push('/signup/collector/verify');
+        if (!isInitializing && isAuthenticated && userRole) { // Ensure userRole is not null
+            if (userRole === 'collector' && (!phoneVerified && !emailVerified)) {
+                router.push('/signup/collector/verify');
+            } else if (userRole === 'admin') {
+                router.push('/admin/dashboard');
+            } else if (userRole === 'public') {
+                router.push('/user/dashboard');
+            }
         }
     }, [isAuthenticated, userRole, phoneVerified, emailVerified, isInitializing, router]);
 
