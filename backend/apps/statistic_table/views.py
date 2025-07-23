@@ -165,7 +165,7 @@ class UserTableView(APIView):
                 'rejected': user['rejected'],
                 'postponed': user['postponed'],
                 'approved_by': user['approved_by'],
-                "addBy": user['addBy'],
+                "initiator": user['initiator'],
             })
 
         return paginator.get_paginated_response(formated_data)

@@ -414,11 +414,17 @@ export function RegisteredUsersTable() {
               <Input
                 placeholder="Search by name, ID, or service code..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setCurrentPage(1);
+                  setSearchTerm(e.target.value);
+                }}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out"
               />
             </div>
-            <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+            <Select value={paymentStatusFilter} onValueChange={(value) => {
+              setCurrentPage(1);
+              setPaymentStatusFilter(value);
+            }}>
               <SelectTrigger className="w-full sm:w-[180px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out">
                 <SelectValue placeholder="Payment Status" />
               </SelectTrigger>
@@ -428,7 +434,10 @@ export function RegisteredUsersTable() {
                 <SelectItem value="Pending">Pending</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={verificationStatusFilter} onValueChange={setVerificationStatusFilter}>
+            <Select value={verificationStatusFilter} onValueChange={(value) => {
+              setCurrentPage(1);
+              setVerificationStatusFilter(value);
+            }}>
               <SelectTrigger className="w-full sm:w-[180px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out">
                 <SelectValue placeholder="Verification Status" />
               </SelectTrigger>

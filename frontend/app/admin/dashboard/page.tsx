@@ -80,7 +80,7 @@ export default function AdminDashboard() {
   payment_status: string;
   email_verified: boolean;
   phone_verified: boolean;
-  addBy: string;
+  initiator: string;
   postponed: boolean;
   rejected: boolean;
   approved: boolean;
@@ -940,7 +940,7 @@ export default function AdminDashboard() {
                                     )}
                                   </TableCell>
                                   <TableCell>
-                                    <span className="text-sm text-gray-600">{user.addBy}</span>
+                                    <span className="text-sm text-gray-600">{user.initiator}</span>
                                   </TableCell>
                                   <TableCell>
                                     <DropdownMenu>
