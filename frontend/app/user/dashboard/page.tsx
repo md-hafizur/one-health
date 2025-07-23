@@ -32,7 +32,7 @@ export default function UserDashboard() {
   const authData = useSelector(selectAuth)
 
   useEffect(() => {
-    if (!authData.isAuthenticated || authData.userRole !== "user") {
+    if (!authData.isAuthenticated || authData.userRole !== "public") {
       router.push("/login");
     }
 

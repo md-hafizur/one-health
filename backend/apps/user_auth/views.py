@@ -20,11 +20,36 @@ class login(APIView):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             contact = serializer.validated_data.get("phone") or serializer.validated_data.get("email")
-            user = User.objects.filter(
-                Q(phone=contact) | Q(email=contact)
-            ).first()
+            account_type = serializer.validated_data.get("account_type")
+
+            match account_type:
+                case "public":
+                    user = User.objects.filter(
+                        Q(phone=contact) | Q(email=contact)&
+                        Q(role__name="public")
+                    ).first()
+
+                    if user is None:
+                        user = User.objects.filter(
+                        Q(parent__phone=contact) | Q(parent__email=contact)&
+                        Q(role__name="subUser")&
+                        Q(password=serializer.validated_data["password"])
+                    ).first()
+                    # print("user222((((((((((()))))))))))", user)
+                    
+                case "dataCollector":
+                    user = User.objects.filter(
+                        Q(phone=contact) | Q(email=contact)&
+                        Q(role__name="dataCollector")
+                    ).first()
+                case "admin":
+                    user = User.objects.filter(
+                        Q(phone=contact) | Q(email=contact)&
+                        Q(role__name="admin")
+                    ).first()
 
             contact_type = "phone" if serializer.validated_data.get("phone") else "email"
+            
             if not user:
                 return Response(
                     {"errors": {"user": ["User not found"]}},
@@ -41,11 +66,11 @@ class login(APIView):
                 "email": "email_verified",
             }
             
-            # if not getattr(user, verification_map[contact_type]):
-            #     return Response(
-            #         {"errors": {contact_type: [f"{contact_type.capitalize()} not verified"]}},
-            #         status=status.HTTP_401_UNAUTHORIZED,
-            #     )
+            if not getattr(user, verification_map[contact_type]):
+                return Response(
+                    {"errors": {contact_type: [f"{contact_type.capitalize()} not verified"]}},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
             visitor_id = request.COOKIES.get("X-Visitor-ID") or request.headers.get(
                 "X-Visitor-ID"
             )

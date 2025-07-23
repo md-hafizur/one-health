@@ -8,10 +8,16 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False)
     password = serializers.CharField()
     remember = serializers.BooleanField(default=False)
+    account_type = serializers.CharField(required=False)
 
     def validate(self, data):
         phone = data.get("phone")
         email = data.get("email")
+        account_type = data.get("account_type")
+
+        # validate if account type is provided
+        if not account_type:
+            raise serializers.ValidationError({"account_type": "Account type is required"})
 
         # validate if email or phone is provided
         if not email and not phone:
