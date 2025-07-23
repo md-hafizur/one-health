@@ -70,8 +70,10 @@ export function PaymentLogsTable() {
         setCount(data.count)
         setNextPage(data.next)
         setPreviousPage(data.previous)
-      } catch (error: any) {
-        toast.error(`Error fetching payment logs: ${error.message}`)
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          toast.error(`Error fetching payment logs: ${error.message}`)
+        }
       } finally {
         setLoading(false) // Set loading to false after fetching (or error)
       }
@@ -93,13 +95,19 @@ export function PaymentLogsTable() {
 
   const totalPages = Math.ceil(count / pageSize)
 
+  const convertToCSV = (data: PaymentLog[]) => {
+    const headers = Object.keys(data[0]) as (keyof PaymentLog)[];
+    const rows = data.map(obj => headers.map(header => obj[header]).join(','));
+    return [headers.join(','), ...rows].join('\n');
+  };
+
   const handleDownloadRecord = (payment: PaymentLog) => {
-    const jsonString = JSON.stringify(payment, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
+    const csvString = convertToCSV([payment]);
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `payment_log_${payment.id}.json`;
+    a.download = `payment_log_${payment.id}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -172,7 +180,7 @@ export function PaymentLogsTable() {
                   </span>
                 </TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => handleDownloadRecord(payment)}>
                     <Download className="h-4 w-4" />
                   </Button>
                 </TableCell>
