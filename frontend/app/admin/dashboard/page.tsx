@@ -59,6 +59,7 @@ import { PaymentLogsTable } from "@/components/payment-logs-table"
 import { PendingCollectorsTable } from "@/components/collectors-applications-table"
 import { PaymentModal } from "@/components/payment-modal"
 import { OtpVerificationModal } from "@/components/otp-verification-modal"
+import { ContactInputDialog } from "@/components/ContactInputDialog"
 import { getCookie } from "@/lib/utils/csrf"
 import { LoadingScreen } from "@/app/LoadingScreen"
 
@@ -69,7 +70,23 @@ export default function AdminDashboard() {
   const [verificationStatusFilter, setVerificationStatusFilter] = useState("all")
   const [viewMode] = useState<"table" | "relationships">("table")
   const [systemStats, setSystemStats] = useState<any[]>([])
-  const [users, setUsers] = useState<any[]>([])
+  interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  roleName: string;
+  is_active: boolean;
+  payment_status: string;
+  email_verified: boolean;
+  phone_verified: boolean;
+  addBy: string;
+  postponed: boolean;
+  rejected: boolean;
+  approved: boolean;
+}
+
+  const [users, setUsers] = useState<User[]>([])
   const [collectors, setCollectors] = useState<any[]>([])
   const [pendingApplications, setPendingApplications] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1);
@@ -525,6 +542,151 @@ export default function AdminDashboard() {
     }
   };
 
+  const handlePostponedReinstate = async (user: any) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const csrfToken = getCookie("csrftoken");
+      const response = await fetch(`${apiUrl}/auth/postponed-reinstate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken || "",
+          },
+          body: JSON.stringify({
+            identity: user.roleName,
+            id: user.id,
+            contact: user.email || user.phone,
+          }),
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      toast.success(result.message);
+      setUsers(users.map(u => u.id === user.id ? { ...u, postponed: !u.postponed } : u));
+    } catch (error: any) {
+      toast.error(`An error occurred: ${error.message}`);
+    }
+  };
+
+  const [showContactInputDialog, setShowContactInputDialog] = useState(false);
+  const [contactInputUser, setContactInputUser] = useState<User | null>(null);
+  const [contactDialogActionType, setContactDialogActionType] = useState<'reject' | 'postponedReinstate' | null>(null);
+
+  const handleApprove = async (user: User) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const csrfToken = getCookie("csrftoken");
+      const response = await fetch(`${apiUrl}/auth/users-approve-reject`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken || "",
+          },
+          body: JSON.stringify({
+            identity: user.roleName,
+            user_id: user.id,
+            approved: true,
+            rejected: false,
+            contact: user.email || user.phone,
+          }),
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      toast.success(result.message);
+      setUsers(users.map(u => u.id === user.id ? { ...u, approved: true, rejected: false } : u));
+    } catch (error: any) {
+      toast.error(`An error occurred: ${error.message}`);
+    }
+  };
+
+  const handleRejectClick = (user: User) => {
+    setContactInputUser(user);
+    setContactDialogActionType('reject');
+    setShowContactInputDialog(true);
+  };
+
+  const handleConfirmContactAction = async (contact: string) => {
+    if (!contactInputUser || !contactDialogActionType) return;
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const csrfToken = getCookie("csrftoken");
+      let payload: any;
+      let endpoint: string;
+
+      if (contactDialogActionType === 'reject') {
+        endpoint = `${apiUrl}/auth/users-approve-reject`;
+        payload = {
+          identity: contactInputUser.roleName,
+          user_id: contactInputUser.id,
+          approved: false,
+          rejected: true,
+          contact: contact,
+        };
+      } else if (contactDialogActionType === 'postponedReinstate') {
+        endpoint = `${apiUrl}/auth/postponed-reinstate`;
+        payload = {
+          identity: contactInputUser.roleName,
+          id: contactInputUser.id,
+          contact: contact,
+        };
+      } else {
+        return; // Should not happen
+      }
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken || "",
+        },
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      toast.success(result.message);
+
+      if (contactDialogActionType === 'reject') {
+        setUsers(users.map(u => u.id === contactInputUser.id ? { ...u, approved: false, rejected: true } : u));
+      } else if (contactDialogActionType === 'postponedReinstate') {
+        setUsers(users.map(u => u.id === contactInputUser.id ? { ...u, postponed: !u.postponed } : u));
+      }
+    } catch (error: any) {
+      toast.error(`An error occurred: ${error.message}`);
+    } finally {
+      setContactInputUser(null);
+      setShowContactInputDialog(false);
+      setContactDialogActionType(null);
+    }
+  };
+
+  const handlePostponedReinstateClick = (user: User) => {
+    setContactInputUser(user);
+    setContactDialogActionType('postponedReinstate');
+    setShowContactInputDialog(true);
+  };
+
   const stats = systemStats
 
   
@@ -702,8 +864,8 @@ export default function AdminDashboard() {
                             <TableBody>
                               {filteredUsers.map((user) => {
                                 const isUserActive = user.roleName === 'dataCollector' 
-                                    ? user.approved 
-                                    : (user.email_verified || user.phone_verified) && user.payment_status === 'Paid';
+                                    ? (user.approved && !user.rejected) 
+                                    : ((user.email_verified || user.phone_verified) && user.payment_status === 'Paid' && !user.rejected && user.approved);
 
                                 return (
                                 <TableRow key={user.id}>
@@ -737,14 +899,18 @@ export default function AdminDashboard() {
                                   </TableCell>
                                   <TableCell>
                                     <Badge
-                                      variant={isUserActive ? "default" : "secondary"}
+                                      variant={user.postponed ? "secondary" : (user.rejected ? "destructive" : (isUserActive ? "default" : "secondary"))}
                                       className={
-                                        isUserActive
-                                          ? "bg-green-100 text-green-800"
-                                          : "bg-yellow-100 text-yellow-800"
+                                        user.postponed
+                                          ? "bg-gray-100 text-gray-800"
+                                          : (user.rejected
+                                            ? "bg-red-100 text-red-800"
+                                            : (isUserActive
+                                              ? "bg-green-100 text-green-800"
+                                              : "bg-yellow-100 text-yellow-800"))
                                       }
                                     >
-                                      {isUserActive ? 'Active' : 'Inactive'}
+                                      {user.postponed ? "Postponed" : (user.rejected ? "Rejected" : (isUserActive ? "Active" : "Inactive"))}
                                     </Badge>
                                   </TableCell>
                                   <TableCell>
@@ -786,9 +952,6 @@ export default function AdminDashboard() {
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">
                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => console.log("View user details")}>
-                                          <Eye className="h-4 w-4 mr-2" /> View Details
-                                        </DropdownMenuItem>
                                         {(!user.email_verified && !user.phone_verified) && user.payment_status === "Pending" && (
                                           <DropdownMenuItem
                                             onClick={() => handleVerifyClick(user)}
@@ -805,6 +968,26 @@ export default function AdminDashboard() {
                                         {(user.email_verified || user.phone_verified) && user.payment_status === "Paid" && (
                                           <DropdownMenuItem>
                                             <FileText className="h-4 w-4 mr-2" /> Card Issued
+                                          </DropdownMenuItem>
+                                        )}
+                                        {(user.email_verified || user.phone_verified) && user.payment_status === "Paid" && !user.rejected && user.approved && !user.postponed && (
+                                          <DropdownMenuItem onClick={() => handlePostponedReinstateClick(user)}>
+                                            <FileText className="h-4 w-4 mr-2" /> Postponed
+                                          </DropdownMenuItem>
+                                        )}
+                                        {(user.email_verified || user.phone_verified) && user.payment_status === "Paid" && !user.rejected && user.approved && user.postponed && (
+                                          <DropdownMenuItem onClick={() => handlePostponedReinstateClick(user)}>
+                                            <FileText className="h-4 w-4 mr-2" /> Reinstate
+                                          </DropdownMenuItem>
+                                        )}
+                                        {user.rejected && (
+                                          <DropdownMenuItem onClick={() => handleApprove(user)}>
+                                            <FileText className="h-4 w-4 mr-2" /> Approve
+                                          </DropdownMenuItem>
+                                        )}
+                                        {!user.rejected && user.approved && !user.postponed && (
+                                          <DropdownMenuItem onClick={() => handleRejectClick(user)}>
+                                            <FileText className="h-4 w-4 mr-2" /> Reject
                                           </DropdownMenuItem>
                                         )}
                                       </DropdownMenuContent>
@@ -965,6 +1148,19 @@ export default function AdminDashboard() {
           contact={verifyingUser.email || verifyingUser.phone || ""}
         />
       )}
+      {/* Contact Input Dialog */}
+      {contactInputUser && (
+        <ContactInputDialog
+          open={showContactInputDialog}
+          onOpenChange={setShowContactInputDialog}
+          onConfirm={handleConfirmContactAction}
+          initialContact={contactDialogActionType === 'reject' || contactDialogActionType === 'postponedReinstate' ? '' : (contactInputUser.email || contactInputUser.phone || "")}
+          title={contactDialogActionType === 'reject' ? "Reject Application" : (contactDialogActionType === 'postponedReinstate' ? (contactInputUser?.postponed ? "Reinstate User" : "Postpone User") : "Enter Contact Information")}
+          description={contactDialogActionType === 'reject' ? `Are you sure you want to reject this ${contactInputUser?.roleName === 'dataCollector' ? 'data collector’s' : contactInputUser?.roleName === 'public' ? 'public user’s' : contactInputUser?.roleName === 'subUser' ? 'sub user’s' : 'user’s'} application? To proceed, please provide the <strong>${contactInputUser?.email ? contactInputUser.email : contactInputUser?.phone}</strong> used by the applicant. Enter the contact below to confirm the rejection.` : (contactDialogActionType === 'postponedReinstate' ? `Are you sure you want to ${contactInputUser?.postponed ? 'reinstate' : 'postpone'} this ${contactInputUser?.roleName === 'dataCollector' ? 'data collector’s' : contactInputUser?.roleName === 'public' ? 'public user’s' : contactInputUser?.roleName === 'subUser' ? 'sub user’s' : 'user’s'} account? To proceed, please provide the <strong>${contactInputUser?.email ? contactInputUser.email : contactInputUser?.phone}</strong> used by the applicant. Enter the contact below to confirm.` : "")}
+        />
+      )}
     </div>
   )
 }
+
+

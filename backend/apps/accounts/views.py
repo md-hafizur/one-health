@@ -263,6 +263,7 @@ class RegisterUserView(APIView):
         # Step 2: Create user profile
         user_profile_data = {
             "user": user.id,
+            "account_type": "public",
             **user_data.get("user_profile", {})
         }
 

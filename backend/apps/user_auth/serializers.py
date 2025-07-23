@@ -35,3 +35,29 @@ class SessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Session
         fields = "__all__"
+
+
+class ApprovedRejectedUserSerializer(serializers.Serializer):
+    identity = serializers.CharField(required=True)
+    user_id = serializers.IntegerField(required=True)
+    contact = serializers.CharField(required=True)
+    approved = serializers.BooleanField(allow_null=True, required=False)
+    rejected = serializers.BooleanField(allow_null=True, required=False)
+
+    def validate(self, data):
+        identity = data.get("identity")
+        user_id = data.get("user_id")
+        contact = data.get("contact")
+        approved = data.get("approved")
+        rejected = data.get("rejected")
+        if not identity:
+            raise serializers.ValidationError({"identity": "Identity is required"})
+        if not user_id:
+            raise serializers.ValidationError({"user_id": "User ID is required"})
+        if not contact:
+            raise serializers.ValidationError({"contact": "Contact is required"})
+        if approved is None and rejected is None:
+            raise serializers.ValidationError(
+                {"action": "Approved or rejected is required"}
+            )
+        return data

@@ -47,6 +47,7 @@ class User(AbstractUser, BaseModel):
     )
 
     rejected = models.BooleanField(default=False)
+    postponed = models.BooleanField(default=False)
 
     rejected_by = models.ForeignKey(
         "self",

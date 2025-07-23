@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.user_auth.models import Session
 
-from .serializers import LoginSerializer
+from .serializers import LoginSerializer, ApprovedRejectedUserSerializer
 from ..accounts.serializers import UserSerializer
 from rest_framework.permissions import IsAuthenticated
 from core.authentication.auth import JWTAuthentication
@@ -293,3 +293,147 @@ class ApprovedUser(APIView):
 
         else:
             return Response({"status": "error", "message": "Invalid action. Provide either approved=True or rejected=True"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DeleteUser(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_role = getattr(request.user.role, 'name', None)
+        if user_role != 'admin':
+            return Response({"status": "error", "message": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        identity = request.data.get('identity')
+        user_id = request.data.get('id')
+        contact = request.data.get('contact')
+
+        if not contact:
+            return Response({"status": "error", "message": "Contact is required to delete user"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user_id:
+            return Response({"status": "error", "message": "User ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        
+
+        if identity == 'subUser':
+            if not contact:
+                return Response({"status": "error", "message": "Parent contact is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            filters = Q(id=user_id) & (Q(parent__email=contact) | Q(parent__phone=contact))
+        else:
+            filters = Q(id=user_id) & (Q(email=contact) | Q(phone=contact))
+
+        user_to_delete = User.objects.filter(filters).only('id', 'first_name').first()
+
+        if not user_to_delete:
+            return Response({"status": "warning", "message": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        user_to_delete.delete()
+        return Response({"status": "success", "message": f"User {user_to_delete.first_name} deleted"}, status=status.HTTP_200_OK)
+
+class PostponedReinstateUser(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_role = getattr(request.user.role, 'name', None)
+        if user_role != 'admin':
+            return Response({"status": "error", "message": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        identity = request.data.get('identity')
+        user_id = request.data.get('id')
+        contact = request.data.get('contact')
+
+        if not contact:
+            return Response({"status": "error", "message": "Contact is required to delete user"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user_id:
+            return Response({"status": "error", "message": "User ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        
+
+        if identity == 'subUser':
+            if not contact:
+                return Response({"status": "error", "message": "Parent contact is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            filters = (
+                Q(id=user_id) &
+                (Q(parent__email=contact) | Q(parent__phone=contact)) 
+            )
+        else:
+            filters = (
+                Q(id=user_id) &
+                (Q(email=contact) | Q(phone=contact))
+            )
+
+        user_to_update = User.objects.filter(filters).only('id', 'first_name').first()
+
+        if not user_to_update:
+            return Response({"status": "warning", "message": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        elif user_to_update.rejected:
+            return Response({"status": "warning", "message": "Cannot postpone a rejected user"}, status=status.HTTP_400_BAD_REQUEST)
+        elif user_to_update.approved is False:
+            return Response({"status": "warning", "message": "Cannot postpone an unapproved user"}, status=status.HTTP_400_BAD_REQUEST)
+        elif user_to_update.email_verified is False and user_to_update.phone_verified is False:
+            return Response({"status": "warning", "message": "Cannot postpone a user with unverified contact"}, status=status.HTTP_400_BAD_REQUEST)
+
+        elif user_to_update.payment_status != 'Paid':
+            return Response({"status": "warning", "message": "Cannot postpone a user with unpaid payment"}, status=status.HTTP_400_BAD_REQUEST)
+
+        match user_to_update.postponed:
+            case True:
+                user_to_update.postponed = False
+            case False:
+                user_to_update.postponed = True
+
+        user_to_update.save(update_fields=['postponed'])
+
+        return Response({"status": "success", "message": f"User {user_to_update.first_name} " + ("postponed" if user_to_update.postponed else "reinstated")}, status=status.HTTP_200_OK)
+
+class UserApproveReject(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user_role = getattr(request.user.role, 'name', None)
+        if user_role != 'admin':
+            return Response({"status": "error", "message": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        serializers_data = ApprovedRejectedUserSerializer(data=request.data)
+        if not serializers_data.is_valid():
+            return Response({"status": "error", "message": serializers_data.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        if serializers_data.validated_data.get("identity") != 'subUser':
+            user = User.objects.filter(
+                Q(id=serializers_data.validated_data.get('user_id')) & 
+                (Q(email=serializers_data.validated_data.get('contact')) | Q(phone=serializers_data.validated_data.get('contact')))
+            ).first()
+        else:
+            user = User.objects.filter(
+                Q(id=serializers_data.validated_data.get('user_id')) & 
+                (Q(parent__email=serializers_data.validated_data.get('contact')) | Q(parent__phone=serializers_data.validated_data.get('contact')))
+            ).first()
+
+        if not user:
+            return Response({"status": "warning", "message": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+        if serializers_data.validated_data.get('approved') is True:
+            user.approved = True
+            user.rejected = False
+            user.approved_by = request.user
+            user.approved_at = timezone.now()
+            user.save(update_fields=['approved','rejected', 'approved_by', 'approved_at'])
+            return Response({"status": "success", "message": f"User {user.first_name} approved"}, status=status.HTTP_200_OK)
+
+        elif serializers_data.validated_data.get('rejected') is True:
+            user.rejected = True
+            user.approved = False
+            user.rejected_by = request.user
+            user.rejected_at = timezone.now()
+            user.save(update_fields=['approved','rejected', 'approved_by', 'approved_at', 'rejected_by', 'rejected_at'])
+            return Response({"status": "success", "message": f"User {user.first_name} rejected"}, status=status.HTTP_200_OK)
+
+
+        return Response({"status": "warning", "message": "Not implemented yet"}, status=status.HTTP_400_BAD_REQUEST)

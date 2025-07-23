@@ -133,7 +133,42 @@ class UserTableView(APIView):
         paginator = self.pagination_class()
         result_page = paginator.paginate_queryset(users, request)
         serializer = UserSerializer(result_page, many=True)
-        return paginator.get_paginated_response(serializer.data)
+        formated_data = []
+
+        for user in serializer.data:
+            is_sub_user = user.get('roleName') == 'subUser'
+            
+            # Safely get child email and phone if subUser
+            email = (
+                user.get('child_contact', {}).get('email') 
+                if is_sub_user 
+                else user.get('email')
+            ) or ""
+            
+            phone = (
+                user.get('child_contact', {}).get('phone') 
+                if is_sub_user 
+                else user.get('phone')
+            ) or ""
+
+            formated_data.append({
+                'id': user['id'],
+                'name': f"{user['first_name']} {user['last_name']}",
+                'email': email,
+                'phone': phone,
+                "phone_verified": user['phone_verified'],
+                "email_verified": user['email_verified'],
+                'roleName': user['roleName'],  # or user['role'] if needed
+                'payment_status': user['payment_status'],
+                'verified': user['email_verified'] or user['phone_verified'],
+                'approved': user['approved'],
+                'rejected': user['rejected'],
+                'postponed': user['postponed'],
+                'approved_by': user['approved_by'],
+                "addBy": user['addBy'],
+            })
+
+        return paginator.get_paginated_response(formated_data)
 
 class CollectorTableView(APIView):
     authentication_classes = [JWTAuthentication]

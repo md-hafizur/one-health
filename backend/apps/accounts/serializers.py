@@ -37,6 +37,9 @@ class UserSerializer(serializers.ModelSerializer):
     guardian_nid = serializers.CharField(required=False,allow_null=True)
     account_type = serializers.CharField(required=False,allow_null=True)
     roleName = serializers.SerializerMethodField()
+    child_contact = serializers.SerializerMethodField()
+    approved_by = serializers.SerializerMethodField()
+    addBy = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -56,6 +59,28 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_roleName(self, obj):
         return obj.role.name if obj.role else None
+
+    def get_approved_by(self, obj):
+        return f'{obj.approved_by.first_name} {obj.approved_by.last_name}' if obj.approved_by else None
+
+    def get_addBy(self, obj):
+        if not obj.addBy:
+            return None
+        return f'{obj.addBy.first_name} {obj.addBy.last_name}'
+
+    def get_child_contact(self, obj):
+
+        if not obj.parent:
+            return None
+        if obj.parent.phone:
+            data = {
+                "Phone": obj.parent.phone
+            }
+        else:
+            data = {
+                "email": obj.parent.email
+            }
+        return data
 
 
     def validate(self, attrs):
