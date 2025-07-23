@@ -23,7 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import UserTable from "../../../components/UserTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 
@@ -624,11 +623,20 @@ export default function AdminDashboard() {
                           <Input
                             placeholder="Search users..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => {
+                              setSearchTerm(e.target.value)
+                              setCurrentPage(1)
+                            }}
                             className="pl-10"
                           />
                         </div>
-                        <Select value={roleFilter} onValueChange={setRoleFilter}>
+                        <Select
+                          value={roleFilter}
+                          onValueChange={(value) => {
+                            setRoleFilter(value)
+                            setCurrentPage(1)
+                          }}
+                        >
                           <SelectTrigger className="w-full sm:w-[180px]">
                             <SelectValue placeholder="Filter by role" />
                           </SelectTrigger>
@@ -639,7 +647,13 @@ export default function AdminDashboard() {
                             <SelectItem value="subUser">Sub User</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+                        <Select
+                          value={paymentStatusFilter}
+                          onValueChange={(value) => {
+                            setPaymentStatusFilter(value)
+                            setCurrentPage(1)
+                          }}
+                        >
                           <SelectTrigger className="w-full sm:w-[180px]">
                             <SelectValue placeholder="Filter by Payment Status" />
                           </SelectTrigger>
@@ -649,7 +663,13 @@ export default function AdminDashboard() {
                             <SelectItem value="Pending">Pending</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Select value={verificationStatusFilter} onValueChange={setVerificationStatusFilter}>
+                        <Select
+                          value={verificationStatusFilter}
+                          onValueChange={(value) => {
+                            setVerificationStatusFilter(value)
+                            setCurrentPage(1)
+                          }}
+                        >
                           <SelectTrigger className="w-full sm:w-[180px]">
                             <SelectValue placeholder="Filter by Verification Status" />
                           </SelectTrigger>
@@ -673,13 +693,19 @@ export default function AdminDashboard() {
                                 <TableHead>Role</TableHead>
                                 <TableHead>Contact</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>AuthVerify</TableHead>
                                 <TableHead>Payment</TableHead>
                                 <TableHead>Initiator</TableHead>
                                 <TableHead>Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {filteredUsers.map((user) => (
+                              {filteredUsers.map((user) => {
+                                const isUserActive = user.roleName === 'dataCollector' 
+                                    ? user.approved 
+                                    : (user.email_verified || user.phone_verified) && user.payment_status === 'Paid';
+
+                                return (
                                 <TableRow key={user.id}>
                                   <TableCell>
                                     <div>
@@ -711,14 +737,26 @@ export default function AdminDashboard() {
                                   </TableCell>
                                   <TableCell>
                                     <Badge
-                                      variant={user.is_active ? "default" : "secondary"}
+                                      variant={isUserActive ? "default" : "secondary"}
                                       className={
-                                        user.is_active
+                                        isUserActive
                                           ? "bg-green-100 text-green-800"
                                           : "bg-yellow-100 text-yellow-800"
                                       }
                                     >
-                                      {user.is_active ? 'Active' : 'Inactive'}
+                                      {isUserActive ? 'Active' : 'Inactive'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={(user.email_verified || user.phone_verified) ? "default" : "secondary"}
+                                      className={
+                                        (user.email_verified || user.phone_verified)
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-yellow-100 text-yellow-800"
+                                      }
+                                    >
+                                      {(user.email_verified || user.phone_verified) ? 'Verified' : 'Unverified'}
                                     </Badge>
                                   </TableCell>
                                   <TableCell>
@@ -773,7 +811,8 @@ export default function AdminDashboard() {
                                     </DropdownMenu>
                                   </TableCell>
                                 </TableRow>
-                              ))}
+                                )
+                              })}
                             </TableBody>
                           </Table>
                         </div>
