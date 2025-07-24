@@ -105,7 +105,7 @@ class User(AbstractUser, BaseModel):
 
 
 class UserProfile(BaseModel):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
 
     # Core profile
     name_en = models.CharField(max_length=100)

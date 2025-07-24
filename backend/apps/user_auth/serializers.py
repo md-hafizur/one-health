@@ -67,3 +67,40 @@ class ApprovedRejectedUserSerializer(serializers.Serializer):
                 {"action": "Approved or rejected is required"}
             )
         return data
+
+class UpdateUserSerializer(serializers.Serializer):
+    first_name = serializers.CharField(required=False)
+    last_name = serializers.CharField(required=False)
+    name_bn = serializers.CharField(required=False)
+    blood_group = serializers.CharField(required=False)
+
+
+    def validate(self, data):
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+        name_bn = data.get("name_bn")
+        blood_group = data.get("blood_group")
+
+        if not first_name and not last_name and not name_bn:
+            raise serializers.ValidationError({"name": "first_name, last_name is required"})
+
+        if not first_name:
+            raise serializers.ValidationError({"first_name": "First name is required"})
+        if not last_name:
+            raise serializers.ValidationError({"last_name": "Last name is required"})
+        if not name_bn:
+            raise serializers.ValidationError({"name_bn": "Name in Bangla is required"})
+
+        if not blood_group:
+            raise serializers.ValidationError({"blood_group": "Blood group is required"})
+        return data
+
+class PasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+    confirm_password = serializers.CharField(required=True)
+    
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError("Passwords do not match.")
+        return data

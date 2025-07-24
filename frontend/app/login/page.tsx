@@ -194,7 +194,16 @@ export default function LoginPage() {
               const result = await response.json();
 
               if (!response.ok) {
-                toast.error(result.message || "An unknown error occurred during admin login.");
+                if (result.message) {
+                  toast.error(result.message);
+                } else if (result.errors) {
+                  Object.entries(result.errors).forEach(([field, errors]) => {
+                    const errorMessages = (errors as string[]).join(" ");
+                    toast.error(`${field}: ${errorMessages}`);
+                  });
+                } else {
+                  toast.error("An unknown error occurred during admin login.");
+                }
                 return;
               }
 
@@ -232,7 +241,16 @@ export default function LoginPage() {
               const result = await response.json();
 
               if (!response.ok) {
-                toast.error(result.message || "An unknown error occurred during public user login.");
+                if (result.message) {
+                  toast.error(result.message);
+                } else if (result.errors) {
+                  Object.entries(result.errors).forEach(([field, errors]) => {
+                    const errorMessages = (errors as string[]).join(" ");
+                    toast.error(`${field}: ${errorMessages}`);
+                  });
+                } else {
+                  toast.error("An unknown error occurred during public user login.");
+                }
                 return;
               }
 

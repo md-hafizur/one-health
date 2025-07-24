@@ -1,4 +1,5 @@
 from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
 from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -9,8 +10,8 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.user_auth.models import Session
 
-from .serializers import LoginSerializer, ApprovedRejectedUserSerializer
-from ..accounts.serializers import UserSerializer
+from .serializers import LoginSerializer, ApprovedRejectedUserSerializer, UpdateUserSerializer,PasswordSerializer
+from ..accounts.serializers import UserSerializer,PublicUserSerializer
 from rest_framework.permissions import IsAuthenticated
 from core.authentication.auth import JWTAuthentication
 
@@ -262,7 +263,42 @@ class UserDetail(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request):
         user = request.user
-        serializer = UserSerializer(user, context={"request": request})
+        serializer = PublicUserSerializer(user, context={"request": request})
+        # formated_data = []
+
+        # for user in serializer.data:
+        #     is_sub_user = user.get('roleName') == 'subUser'
+            
+        #     # Safely get child email and phone if subUser
+        #     email = (
+        #         user.get('child_contact', {}).get('email') 
+        #         if is_sub_user 
+        #         else user.get('email')
+        #     ) or ""
+            
+        #     phone = (
+        #         user.get('child_contact', {}).get('phone') 
+        #         if is_sub_user 
+        #         else user.get('phone')
+        #     ) or ""
+
+        #     formated_data.append({
+        #         'id': user['id'],
+        #         'name': f"{user['first_name']} {user['last_name']}",
+        #         'email': email,
+        #         'phone': phone,
+        #         "phone_verified": user['phone_verified'],
+        #         "email_verified": user['email_verified'],
+        #         'roleName': user['roleName'],  # or user['role'] if needed
+        #         'payment_status': user['payment_status'],
+        #         'verified': user['email_verified'] or user['phone_verified'],
+        #         'approved': user['approved'],
+        #         'rejected': user['rejected'],
+        #         'postponed': user['postponed'],
+        #         'approved_by': user['approved_by'],
+        #         "initiator": user['initiator'],
+        #     })
+        
         return Response(serializer.data)
 
 class ApprovedUser(APIView):
@@ -462,3 +498,66 @@ class UserApproveReject(APIView):
 
 
         return Response({"status": "warning", "message": "Not implemented yet"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdateUsers(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def put(self, request):
+        user = request.user  # Authenticated user
+        profile = getattr(user, 'profile', None)
+
+        if not profile:
+            return Response({"status": "error", "message": "User profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UpdateUserSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response({"status": "error", "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        validated = serializer.validated_data
+
+        try:
+            # Update user
+            user.first_name = validated.get('first_name', user.first_name)
+            user.last_name = validated.get('last_name', user.last_name)
+            user.save(update_fields=['first_name', 'last_name'])
+
+            # Update profile
+            profile.name_bn = validated.get('name_bn', profile.name_bn)
+            profile.name_en = f"{user.first_name} {user.last_name}"
+            profile.save(update_fields=['name_bn', 'name_en'])
+
+        except Exception as e:
+            transaction.set_rollback(True)
+            return Response({"status": "error", "message": f"Update failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"status": "success", "message": "User updated successfully"}, status=status.HTTP_200_OK)
+
+
+class UpdateUserPassword(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        user = request.user
+        serializer = PasswordSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response({"status": "error", "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        validated = serializer.validated_data
+        user = User.objects.filter(id=user.id, password=validated['current_password']).first()
+        if not user:
+            return Response({"status": "error", "message": "Invalid current password"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            user.set_password(validated['new_password'])
+            user.save(update_fields=['password'])
+
+        except Exception as e:
+            return Response({"status": "error", "message": f"Update failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"status": "success", "message": "User updated successfully"}, status=status.HTTP_200_OK)

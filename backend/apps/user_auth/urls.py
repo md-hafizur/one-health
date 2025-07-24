@@ -10,4 +10,6 @@ urlpatterns = [
     path('postponed-reinstate', views.PostponedReinstateUser.as_view(), name='postponed-reinstate'),
     path('delete-user', views.DeleteUser.as_view(), name='delete-user'),
     path('users-approve-reject', views.UserApproveReject.as_view(), name='users-approve-reject'),
+    path('users-update', views.UpdateUsers.as_view(), name='users-update'),
+    path('user-change-password', views.UpdateUserPassword.as_view(), name='user-change-password'),
 ]
