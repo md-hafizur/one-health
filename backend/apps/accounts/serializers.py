@@ -1,6 +1,7 @@
 # # accounts/serializers.py
 from rest_framework import serializers
-from .models import User, Role
+from .models import User, Role, UserProfile
+from apps.address.models import Address
 from core.constants import UserRole
 from datetime import datetime
 from django.db.models import Q
@@ -37,6 +38,9 @@ class UserSerializer(serializers.ModelSerializer):
     guardian_nid = serializers.CharField(required=False,allow_null=True)
     account_type = serializers.CharField(required=False,allow_null=True)
     roleName = serializers.SerializerMethodField()
+    child_contact = serializers.SerializerMethodField()
+    approved_by = serializers.SerializerMethodField()
+    initiator = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -56,6 +60,28 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_roleName(self, obj):
         return obj.role.name if obj.role else None
+
+    def get_approved_by(self, obj):
+        return f'{obj.approved_by.first_name} {obj.approved_by.last_name}' if obj.approved_by else None
+
+    def get_initiator(self, obj):
+        if not obj.addBy:
+            return None
+        return f'{obj.addBy.first_name} {obj.addBy.last_name}'
+
+    def get_child_contact(self, obj):
+
+        if not obj.parent:
+            return None
+        if obj.parent.phone:
+            data = {
+                "Phone": obj.parent.phone
+            }
+        else:
+            data = {
+                "email": obj.parent.email
+            }
+        return data
 
 
     def validate(self, attrs):
@@ -112,6 +138,113 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+class AddressSerializer(serializers.ModelSerializer):
+    full_address = serializers.SerializerMethodField()
+    class Meta:
+        model = Address
+        fields = ['id','full_address']
+
+    def get_full_address(self, obj):
+        return f"{obj.para}, {obj.village}, {obj.union}, {obj.upazila}, {obj.zilla}, {obj.division}"
+
+class PublicProfileSerializer(serializers.ModelSerializer):
+    address = AddressSerializer(read_only=True)
+    class Meta:
+        model = UserProfile
+        fields = [
+            'id', 
+            "name_bn",
+            'data_of_birth',
+            'address',
+            'photo',
+            'blood_group',
+            'relationship',
+            'address'
+
+            ]
+
+class PublicSubUserSerializer(serializers.ModelSerializer):
+    email = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    profile = PublicProfileSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 
+            'first_name',
+            'last_name',
+            'phone',
+            'email', 
+            'status',
+            'name',
+            'profile'
+            ]
+
+    def get_email(self, obj):
+        parent = getattr(obj, 'parent', None)
+        return parent.email if parent else None
+
+    def get_phone(self, obj):
+        parent = getattr(obj, 'parent', None)
+        return parent.phone if parent else None
+
+    def get_status(self, obj):
+        # 1. If payment_status is 'Paid' and (email_verified or phone_verified), then 'active'
+        if obj.payment_status == 'Paid' and (obj.email_verified or obj.phone_verified) and obj.approved:
+            return 'active'
+        # 2. If rejected is True, then 'rejected'
+        if obj.rejected:
+            return 'rejected'
+        # 3. If postponed is True, then 'postponed'
+        if obj.postponed:
+            return 'postponed'
+        # Default case (optional)
+        return 'pending'
+    def get_name(self, obj):
+        return obj.get_full_name()
+
+
+class PublicUserSerializer(serializers.ModelSerializer):
+    children = PublicSubUserSerializer(many=True, read_only=True)
+    profile = PublicProfileSerializer(read_only=True)
+    status = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'first_name',
+            'last_name',
+            'phone',
+            'email',
+            'children', 
+            'profile',
+            'status',
+            'name',
+        ]
+
+    def get_status(self, obj):
+        # 1. If payment_status is 'Paid' and (email_verified or phone_verified), then 'active'
+        if obj.payment_status == 'Paid' and (obj.email_verified or obj.phone_verified) and obj.approved:
+            return 'active'
+        # 2. If rejected is True, then 'rejected'
+        if obj.rejected:
+            return 'rejected'
+        # 3. If postponed is True, then 'postponed'
+        if obj.postponed:
+            return 'postponed'
+        # Default case (optional)
+        return 'pending'
+    def get_name(self, obj):
+        return obj.get_full_name()
+
+    
+
+    
 # from .models import UserProfile
 
 # class UserProfileSerializer(serializers.ModelSerializer):

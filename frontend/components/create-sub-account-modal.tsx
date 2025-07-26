@@ -143,6 +143,22 @@ export function CreateSubAccountModal({ open, onOpenChange }: CreateSubAccountMo
         {/* Step 3: Sub-Account Details */}
         {step === 3 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+            {/* Parameter Fill-up Progress */}
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-1">
+                <Label>Parameter Progress</Label>
+                <span className="text-sm text-gray-600">{Math.round(((formData.name ? 1 : 0) + (formData.age ? 1 : 0) + (formData.gender ? 1 : 0)) / 3 * 100)}% Complete</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <motion.div
+                  className="bg-blue-500 h-2 rounded-full"
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${((formData.name ? 1 : 0) + (formData.age ? 1 : 0) + (formData.gender ? 1 : 0)) / 3 * 100}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            </div>
+
             <div>
               <Label htmlFor="name">Full Name</Label>
               <Input
@@ -179,7 +195,11 @@ export function CreateSubAccountModal({ open, onOpenChange }: CreateSubAccountMo
               <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
                 Back
               </Button>
-              <Button onClick={handleCreateAccount} className="flex-1 bg-green-600 hover:bg-green-700">
+              <Button
+                onClick={handleCreateAccount}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                disabled={!formData.name || !formData.age || !formData.gender}
+              >
                 Create Account
               </Button>
             </div>
