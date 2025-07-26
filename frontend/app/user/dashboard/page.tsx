@@ -119,6 +119,9 @@ export default function UserDashboard() {
   const [currentPassword, setCurrentPassword] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [currentPasswordError, setCurrentPasswordError] = useState<string | null>(null);
+  const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
   const visitorIdRef = useRef<string | null>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,30 +287,43 @@ export default function UserDashboard() {
   };
 
   const handleChangePassword = useCallback(async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error("All password fields are required.");
-      return;
+    setCurrentPasswordError(null);
+    setNewPasswordError(null);
+    setConfirmPasswordError(null);
+
+    let hasError = false;
+
+    if (!currentPassword) {
+      setCurrentPasswordError("Current password is required.");
+      hasError = true;
+    }
+    if (!newPassword) {
+      setNewPasswordError("New password is required.");
+      hasError = true;
+    }
+    if (!confirmPassword) {
+      setConfirmPasswordError("Confirm password is required.");
+      hasError = true;
     }
 
-    if (newPassword !== confirmPassword) {
-      toast.error("New password and confirm password do not match.");
-      return;
+    if (newPassword && confirmPassword && newPassword !== confirmPassword) {
+      setNewPasswordError("New password and confirm password do not match.");
+      setConfirmPasswordError("New password and confirm password do not match.");
+      hasError = true;
     }
 
-    if (newPassword !== confirmPassword) {
-      toast.error("New password and confirm password do not match.");
-      return;
-    }
-
-    if (newPassword.length < 8 ||
+    if (newPassword && (newPassword.length < 8 ||
         !/[A-Z]/.test(newPassword) ||
         !/[a-z]/.test(newPassword) ||
         !/[0-9]/.test(newPassword) ||
-        !/[^A-Za-z0-9]/.test(newPassword)
-    ) {
-      toast.error(
-        "New password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+        !/[^A-Za-z0-9]/.test(newPassword))) {
+      setNewPasswordError(
+        "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
       );
+      hasError = true;
+    }
+
+    if (hasError) {
       return;
     }
 
@@ -360,6 +376,9 @@ export default function UserDashboard() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setCurrentPasswordError(null);
+      setNewPasswordError(null);
+      setConfirmPasswordError(null);
     } catch (e: any) {
       toast.error(`An unexpected error occurred: ${e.message}`);
     } finally {
@@ -818,6 +837,7 @@ export default function UserDashboard() {
                               onChange={(e) => setCurrentPassword(e.target.value)}
                               className="col-span-3"
                             />
+                            {currentPasswordError && <p className="col-span-4 text-red-500 text-sm mt-1">{currentPasswordError}</p>}
                           </div>
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="new-password" className="text-right">
@@ -830,6 +850,7 @@ export default function UserDashboard() {
                               onChange={(e) => setNewPassword(e.target.value)}
                               className="col-span-3"
                             />
+                            {newPasswordError && <p className="col-span-4 text-red-500 text-sm mt-1">{newPasswordError}</p>}
                           </div>
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="confirm-password" className="text-right">
@@ -842,6 +863,7 @@ export default function UserDashboard() {
                               onChange={(e) => setConfirmPassword(e.target.value)}
                               className="col-span-3"
                             />
+                            {confirmPasswordError && <p className="col-span-4 text-red-500 text-sm mt-1">{confirmPasswordError}</p>}
                           </div>
                         </div>
                         <DialogFooter>
