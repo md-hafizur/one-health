@@ -18,7 +18,7 @@ import { useDispatch, useSelector } from "react-redux"
 import { setField, selectSignup, resetSignup, SignupState } from "@/lib/redux/signupSlice"
 import { setLogin, selectAuth, setAllowLoginAccess } from "@/lib/redux/authSlice"
 import type { RootState } from "@/lib/redux/store"
-import { getCookie } from "@/lib/utils/csrf";
+import Cookies from 'js-cookie';
 
 export default function LoginPage() {
   const [activeRole, setActiveRole] = useState("public")
@@ -94,31 +94,34 @@ export default function LoginPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Visitor-ID": visitorId,
-            "X-CSRFToken": getCookie("csrftoken") || "",
+            "X-Visitor-ID": visitorId || "",
           },
           body: JSON.stringify(payload),
-          credentials: "include", // Required for sending cookies with cross-origin requests
-        })
+          credentials: "include",
+        });
 
-        const result = await response.json()
+        const result = await response.json();
         console.log("API Response Result:", result);
 
         if (!response.ok) {
           if (result.message) {
-            toast.error(result.message)
+            toast.error(result.message);
           } else if (result.errors) {
             Object.entries(result.errors).forEach(([field, errors]) => {
-              const errorMessages = (errors as string[]).join(" ")
-              toast.error(`${field}: ${errorMessages}`)
-            })
+              const errorMessages = (errors as string[]).join(" ");
+              toast.error(`${field}: ${errorMessages}`);
+            });
           } else {
-            toast.error("An unknown error occurred during login.")
+            toast.error("An unknown error occurred during login.");
           }
-          return
+          return;
         }
 
-        toast.success(result.message || "Login successful!")
+        toast.success(result.message || "Login successful!");
+        const { roleName, page_permissions } = result;
+        Cookies.set('roleName', roleName, { expires: 7 });
+        Cookies.set('page_permissions', JSON.stringify(page_permissions), { expires: 7 });
+
         const phoneVerified = result.phone_verified ?? false;
         const emailVerified = result.email_verified ?? false;
         const applicationId = result.id;
@@ -129,7 +132,19 @@ export default function LoginPage() {
 
         const paymentMade = result.payment_made ?? false;
 
-        dispatch(setLogin({ role: "collector", phoneVerified: phoneVerified, emailVerified: emailVerified, applicationId: applicationId, contact: contact, contactType: contactType, firstName: firstName, lastName: lastName, paymentMade: paymentMade }));
+        dispatch(setLogin({ 
+          role: "collector", 
+          roleName, 
+          page_permissions, 
+          phoneVerified, 
+          emailVerified, 
+          applicationId, 
+          contact, 
+          contactType, 
+          firstName, 
+          lastName, 
+          paymentMade 
+        }));
 
         if ((contactType === "phone" && !phoneVerified) || (contactType === "email" && !emailVerified)) {
           console.log(
@@ -157,7 +172,13 @@ export default function LoginPage() {
           router.push("/collector/dashboard");
         } else {
           console.log("Login Page - Redirecting to dashboard.")
-          router.push("/collector/dashboard")
+          if (roleName === 'dataCollector') {
+            router.push("/collector/dashboard");
+          } else if (roleName === 'public') {
+            router.push("/user/dashboard");
+          } else if (roleName === 'admin') {
+            router.push("/admin/dashboard");
+          }
         }
 
       } else {
@@ -183,7 +204,7 @@ export default function LoginPage() {
                 headers: {
                   "Content-Type": "application/json",
                   "X-Visitor-ID": visitorId,
-                  "X-CSRFToken": getCookie("csrftoken") || "",
+                  "X-CSRFToken": Cookies.get("csrftoken") || "",
                 },
                 body: JSON.stringify({
                   ...payload,
@@ -208,8 +229,11 @@ export default function LoginPage() {
               }
 
               toast.success(result.message || "Admin login successful!");
-              dispatch(setLogin({ role: "admin", phoneVerified: true, emailVerified: true, applicationId: result.id, contact: result.email || result.phone, contactType: result.email ? "email" : "phone", firstName: result.first_name, lastName: result.last_name, paymentMade: true }));
-              router.push("/admin/dashboard");
+              const { roleName, page_permissions } = result;
+              Cookies.set('roleName', roleName, { expires: 7 });
+              Cookies.set('page_permissions', JSON.stringify(page_permissions), { expires: 7 });
+              dispatch(setLogin({ role: "admin", roleName, page_permissions, phoneVerified: true, emailVerified: true, applicationId: result.id, contact: result.email || result.phone, contactType: result.email ? "email" : "phone", firstName: result.first_name, lastName: result.last_name, paymentMade: true }));
+              router.replace("/admin/dashboard");
             } catch (error) {
               console.error("Admin Login Error:", error);
               toast.error("An unexpected error occurred during admin login. Please try again later.");
@@ -228,7 +252,7 @@ export default function LoginPage() {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  "X-CSRFToken": getCookie("csrftoken") || "",
+                  "X-CSRFToken": Cookies.get("csrftoken") || "",
                   "X-Visitor-ID": visitorId || "",
                 },
                 body: JSON.stringify({
@@ -255,10 +279,11 @@ export default function LoginPage() {
               }
 
               toast.success(result.message || "Public user login successful!");
-              dispatch(setLogin({ role: "public", phoneVerified: result.phone_verified ?? false, emailVerified: result.email_verified ?? false, applicationId: result.id, contact: result.email || result.phone, contactType: result.email ? "email" : "phone", firstName: result.first_name, lastName: result.last_name, paymentMade: result.payment_made ?? false }));
-              if (authData.isAuthenticated && !authData.allowLoginAccessWhileAuthenticated) {
-                router.push("/user/dashboard");
-              }
+              const { roleName, page_permissions } = result;
+              Cookies.set('roleName', roleName, { expires: 7 });
+              Cookies.set('page_permissions', JSON.stringify(page_permissions), { expires: 7 });
+              dispatch(setLogin({ role: "public", roleName, page_permissions, phoneVerified: result.phone_verified ?? false, emailVerified: result.email_verified ?? false, applicationId: result.id, contact: result.email || result.phone, contactType: result.email ? "email" : "phone", firstName: result.first_name, lastName: result.last_name, paymentMade: result.payment_made ?? false }));
+              router.replace("/user/dashboard");
 
             } catch (error) {
               console.error("Public User Login Error:", error);

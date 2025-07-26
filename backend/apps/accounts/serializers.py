@@ -1,16 +1,24 @@
 # # accounts/serializers.py
 from rest_framework import serializers
 from .models import User, Role, UserProfile
+from apps.permissions.models import PagePermission
 from apps.address.models import Address
 from core.constants import UserRole
 from datetime import datetime
 from django.db.models import Q
 from apps.payment.models import PaymentFee
 
+class PagePermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PagePermission
+        fields = ['id', 'role', 'name', 'route']
+
 class RoleSerializer(serializers.ModelSerializer):
+    permissions = PagePermissionSerializer(many=True, read_only=True)
+
     class Meta:
         model = Role
-        fields = ['id', 'name', 'label']
+        fields = ['id', 'name', 'label', 'permissions']
 
 # serializers.py
 class ChildUserSerializer(serializers.ModelSerializer):
@@ -33,7 +41,6 @@ class UserSerializer(serializers.ModelSerializer):
     children = ChildUserSerializer(many=True, read_only=True)
     childCount = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField()
-    role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.all())
     confirm_password = serializers.CharField(write_only=True)
     guardian_nid = serializers.CharField(required=False,allow_null=True)
     account_type = serializers.CharField(required=False,allow_null=True)
@@ -41,6 +48,7 @@ class UserSerializer(serializers.ModelSerializer):
     child_contact = serializers.SerializerMethodField()
     approved_by = serializers.SerializerMethodField()
     initiator = serializers.SerializerMethodField()
+    page_permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -68,6 +76,12 @@ class UserSerializer(serializers.ModelSerializer):
         if not obj.addBy:
             return None
         return f'{obj.addBy.first_name} {obj.addBy.last_name}'
+    
+    def get_page_permissions(self, obj):
+        if not obj.role:
+            return []
+        permissions = PagePermission.objects.filter(role=obj.role)
+        return PagePermissionSerializer(permissions, many=True).data
 
     def get_child_contact(self, obj):
 

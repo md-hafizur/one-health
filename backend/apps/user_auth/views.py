@@ -4,6 +4,7 @@ from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+import json
 
 from django.utils import timezone
 
@@ -97,8 +98,15 @@ class login(APIView):
                     user_agent=request.META.get("HTTP_USER_AGENT"),
                     ip=request.META.get("REMOTE_ADDR")
                 )
+
+            user_data = UserSerializer(user, context={"request": request}).data
+            role = user_data.get("roleName", None)
+            permissions = user_data.get("page_permissions", [])
+
+
             response =  Response(
-                UserSerializer(user, context={"request": request}).data
+                user_data,
+                status=status.HTTP_200_OK,
             )
             response.set_cookie(
                 "access-token",
@@ -117,6 +125,23 @@ class login(APIView):
                 httponly=True,
                 samesite="None",
                 secure=True,
+            )
+            response.set_cookie(
+                "roleName",
+                role,
+                max_age=60 * 60 * 24 * 7,
+                secure=True,
+                samesite="None",
+                path="/"
+            )
+
+            response.set_cookie(
+                "page_permissions",
+                json.dumps(list(permissions)),
+                max_age=60 * 60 * 24 * 7,
+                secure=True,
+                samesite="None",
+                path="/"
             )
             return response
         return Response(serializer.errors, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
@@ -253,6 +278,10 @@ class logout(APIView):
         response = Response(
             {"message": "Logout successful"}, status=status.HTTP_200_OK
         )
+        response.delete_cookie("roleName")
+        response.delete_cookie("page_permissions")
+        response.delete_cookie("X-Visitor-ID")
+        response.delete_cookie("csrfToken")
         response.delete_cookie("access-token")
         response.delete_cookie("refresh-token")
         response.delete_cookie("X-Visitor-ID")

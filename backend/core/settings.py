@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'apps.payment',
     'apps.address',
     'apps.statistic_table',
+    'apps.permissions',
     
 ]
 

@@ -2,47 +2,64 @@
 
 import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectAuth, setLogin, setAuthInitialized } from '@/lib/redux/authSlice';
-import { getCookie } from '@/lib/utils/csrf';
-import type { AppDispatch } from '@/lib/redux/store';
-import { useRouter } from 'next/navigation';
+import { setLogin } from '@/lib/redux/authSlice';
+import type { RootState, AppDispatch } from '@/lib/redux/store';
+import { useRouter, usePathname } from 'next/navigation';
 import { loadState } from '@/lib/redux/store';
+import { getCurrentBrowserFingerPrint } from "@rajesh896/broprint.js";
 
 export function AuthInitializer({ children }: { children: React.ReactNode }) {
     const dispatch = useDispatch<AppDispatch>();
     const router = useRouter();
-    const { isAuthenticated, userRole, phoneVerified, emailVerified, isInitializing } = useSelector(selectAuth);
-    const [hydrated, setHydrated] = useState(false);
+    const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+    const userRole = useSelector((state: RootState) => state.auth.userRole);
+    const phoneVerified = useSelector((state: RootState) => state.auth.phoneVerified);
+    const emailVerified = useSelector((state: RootState) => state.auth.emailVerified);
+    const currentPath = usePathname();
+    const [isHydrated, setIsHydrated] = useState(false); // Local state for hydration
 
     useEffect(() => {
         // Only hydrate Redux state from localStorage on client
         const persisted = loadState();
         if (persisted && persisted.auth) {
             const { userRole, firstName, lastName, phoneVerified, emailVerified, applicationId, contact, contactType, paymentMade } = persisted.auth;
-            dispatch(setLogin({ role: userRole, firstName, lastName, phoneVerified, emailVerified, applicationId, contact, contactType, paymentMade }));
+            dispatch(setLogin({
+                role: userRole,
+                roleName: persisted.auth.roleName,
+                page_permissions: persisted.auth.page_permissions,
+                firstName,
+                lastName,
+                phoneVerified,
+                emailVerified,
+                applicationId,
+                contact,
+                contactType,
+                paymentMade
+            }));
         }
-        dispatch(setAuthInitialized());
-        setHydrated(true);
+        setIsHydrated(true); // Set to true after Redux state is loaded
     }, [dispatch]);
 
     useEffect(() => {
-        if (!isInitializing && isAuthenticated && userRole) { // Ensure userRole is not null
+        if (isHydrated && isAuthenticated && userRole) { // Depend on isHydrated
             if (userRole === 'collector' && (!phoneVerified && !emailVerified)) {
-                router.push('/signup/collector/verify');
+                if (currentPath !== '/signup/collector/verify') {
+                    router.push('/signup/collector/verify');
+                }
             } else if (userRole === 'admin') {
-                router.push('/admin/dashboard');
+                if (!currentPath.startsWith('/admin')) {
+                    router.push('/admin/dashboard');
+                }
             } else if (userRole === 'public') {
-                router.push('/user/dashboard');
+                if (!currentPath.startsWith('/user')) {
+                    router.push('/user/dashboard');
+                }
             }
         }
-    }, [isAuthenticated, userRole, phoneVerified, emailVerified, isInitializing, router]);
+    }, [isAuthenticated, userRole, phoneVerified, emailVerified, router, currentPath, isHydrated]); // Add isHydrated to dependency array
 
-    if (!hydrated || isInitializing) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50">
-                <div className="text-lg font-semibold text-gray-700">Loading Application...</div>
-            </div>
-        );
+    if (!isHydrated) {
+        return null;
     }
 
     return <>{children}</>;

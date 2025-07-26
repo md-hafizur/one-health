@@ -1,21 +1,21 @@
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+
 from core.authentication.auth import JWTAuthentication
 from core.pagination.user_pagination import UserPagination
-from rest_framework.permissions import IsAuthenticated
+
 from apps.accounts.models import User
-from apps.payment.models import PaymentLog, Payment
 from apps.accounts.serializers import UserSerializer
+from apps.payment.models import PaymentLog, Payment
 from apps.payment.serializers import PaymentLogSerializer
 
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Sum
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 
 
 class systemStatistic(APIView):
@@ -92,11 +92,13 @@ class UserTableView(APIView):
     def get(self, request):
         user_role = request.user.role.name
         if user_role != 'admin':
-            return Response({"status": "error", "message": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
-            
+            return Response(
+                {"status": "error", "message": "Permission denied"},
+                status=status.HTTP_403_FORBIDDEN
+            )
         users = User.objects.all().exclude(role__name__in=['admin']).order_by('-id')
         role = request.query_params.get('roleName', None)
-        status = request.query_params.get('status', None)
+        stats = request.query_params.get('status', None)
         term = request.query_params.get('term', None)
 
 
@@ -110,11 +112,11 @@ class UserTableView(APIView):
                 print("role", role)
                 users = users.filter(Q(role__name__icontains=role))
 
-        match status:
+        match stats:
             case 'Paid':
-                users = users.filter(Q(payment_status=status))
+                users = users.filter(Q(payment_status=stats))
             case 'Pending':
-                users = users.filter(Q(payment_status=status))
+                users = users.filter(Q(payment_status=stats))
             case 'verified':
                 users = users.filter(Q(email_verified=True) | Q(phone_verified=True))
             case 'unverified':

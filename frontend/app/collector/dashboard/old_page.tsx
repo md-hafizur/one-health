@@ -113,21 +113,13 @@ export default function CollectorDashboard() {
   }, []);
 
 const handleLogout = async () => {
+  console.log("Logout button clicked.");
+
   const clearStateAndRedirect = () => {
     dispatch(setLogout());
     dispatch(resetSignup());
     localStorage.removeItem('authState');
     localStorage.removeItem('signupState');
-
-    // Clear cookies
-    const deleteCookie = (name: string) => {
-      document.cookie = `${name}=; Max-Age=0; path=/;`;
-    };
-    deleteCookie("token");
-    deleteCookie("roleName");
-    deleteCookie("page_permissions");
-    deleteCookie("csrftoken");
-
     router.push("/login");
   };
 
@@ -149,11 +141,11 @@ const handleLogout = async () => {
       credentials: "include",
     });
 
-    const result = await response.json();
-
     if (!response.ok) {
+      const result = await response.json();
       toast.error(result.message || "Logout failed.");
     } else {
+      const result = await response.json();
       toast.success(result.message || "Logged out successfully!");
     }
   } catch (error) {
@@ -163,7 +155,6 @@ const handleLogout = async () => {
     clearStateAndRedirect();
   }
 };
-
 
 
   const stats = [
