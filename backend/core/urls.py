@@ -26,4 +26,5 @@ urlpatterns = [
     path('auth/', include('apps.user_auth.urls')),
     path('address/', include('apps.address.urls')),
     path('data/', include('apps.statistic_table.urls')),
+    path('reports/', include('apps.reports.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

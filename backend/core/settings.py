@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'apps.address',
     'apps.statistic_table',
     'apps.permissions',
+    'apps.reports',
     
 ]
 
